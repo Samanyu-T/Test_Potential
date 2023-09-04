@@ -52,6 +52,10 @@ class Lammps_Intersitial():
         
     def Build_Intersitial(self, size, atype, pos):
 
+        potfolder = 'Potentials/Tungsten_Hydrogen_Helium/'
+
+        potfile = potfolder + 'WHHe_new.eam.alloy'
+
         lmp = lammps()
 
         lmp.command('# Lammps input file')
@@ -68,7 +72,7 @@ class Lammps_Intersitial():
 
         lmp.command('region r_simbox block 0 %d 0 %d 0 %d units lattice' % (size, size, size))
                     
-        lmp.command('create_box 3 r_simbox')
+        lmp.command('create_box 2 r_simbox')
         
         lmp.command('create_atoms 1 box')
 
@@ -84,12 +88,11 @@ class Lammps_Intersitial():
 
         lmp.command('mass 2 1.00784')
 
-        lmp.command('mass 3 4.002602')
+        #lmp.command('mass 3 4.002602')
 
         lmp.command('pair_style eam/alloy' )
 
-        lmp.command('pair_coeff * * W_H_He_0001.eam.alloy W H He')
-        #lmp.command('pair_coeff * * MNL6_WH.eam.alloy W H')
+        lmp.command('pair_coeff * * %s W H' % potfile)
 
         lmp.command('run 0')
 
@@ -107,7 +110,6 @@ class Lammps_Intersitial():
 
         lmp.command('run 0')
 
-        lmp.command('write_dump all custom Dump/%s.dump id type x y z c_potential modify sort id' % pos)
         pe = lmp.get_thermo('pe')
 
         lmp.close()
@@ -115,7 +117,7 @@ class Lammps_Intersitial():
         return pe
     
 Instance = Lammps_Intersitial()
-size = 5
+size = 9
 atype = 2
 perfect = Instance.Build_Intersitial(size, atype, 'crystalline')
 oct = Instance.Build_Intersitial(size, atype, 'oct')
