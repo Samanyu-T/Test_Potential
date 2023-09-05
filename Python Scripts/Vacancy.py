@@ -79,14 +79,17 @@ class Lammps_Vacancy():
         for i in range(n_vac):
 
             lmp.command('region r_vac_%d sphere %f %f %f 0.1 units lattice' 
-                        % (i, size//2 + i/2, size//2 + i/2, size//2 + i/2))
+                        % (i, size//2 + (i+1)/2, size//2 + (i+1)/2, size//2 + (i+1)/2))
             
             lmp.command('delete_atoms region r_vac_%d ' % i)
          
 
 
         #lmp.command('create_atoms 3 single 2.4 2.4 2.4 units lattice')
-        #lmp.command('create_atoms 2 single 2.5 2.5 2.5 units lattice')
+            lmp.command('create_atoms 3 single %f %f %f units lattice' 
+                        % ( size//2 + 0.25, size//2 + 0.5, size//2 + 0.5))
+            lmp.command('create_atoms 3 single %f %f %f units lattice' 
+                        % ( size//2 + 0.75, size//2 + 0.5, size//2 + 0.5))
 
         #lmp.command('create_atoms 3 single 2.6 2.4 2.7 units lattice')
 
@@ -125,13 +128,14 @@ class Lammps_Vacancy():
     
 Instance = Lammps_Vacancy()
 
-size  = 10
-n_vac = 3
+size  = 7
+n_vac = 1
 n_he  = 0
 n_h   = 0
 
 b_energy = np.array([-8.949, -4.25/2, 0])
 
+perfect = -8.95*2*size**3 
 perfect = Instance.Build_Vacancy(size, 0, 0, 0)
 
 vacancy = Instance.Build_Vacancy(size, n_h, n_he, n_vac)

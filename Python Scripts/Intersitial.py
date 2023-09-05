@@ -7,6 +7,9 @@ from lammps import lammps
 from ctypes import *
 from mpi4py import MPI
 from itertools import combinations_with_replacement
+import pandas as pd
+from IPython.display import display, Latex
+import matplotlib.pyplot as plt
 
 
 # template to replace MPI functionality for single threaded use
@@ -54,7 +57,7 @@ class Lammps_Intersitial():
 
         potfolder = 'Potentials/Tungsten_Hydrogen_Helium/'
 
-        potfile = potfolder + 'WHHe_final.eam.alloy'
+        potfile = potfolder + 'W_H_He.eam.alloy'
 
         lmp = lammps()
 
@@ -78,12 +81,15 @@ class Lammps_Intersitial():
 
         if pos == 'tet':
             lmp.command('create_atoms %d single %f %f %f units lattice' 
-                        % (atype, size//2 + 0.25, size//2  + 0.5, size//2))
+                        % (atype, size//2 + 0.25, size//2  + 0.5, size//2 + 0))
             
         elif pos == 'oct':
             lmp.command('create_atoms %d single %f %f %f units lattice' 
                         % (atype, size//2 + 0.5, size//2 + 0.5, size//2 + 0)) 
-                   
+        
+        elif pos == '111':
+            lmp.command('create_atoms %d single %f %f %f units lattice' 
+                        % (atype, size//2 + 0.25, size//2 + 0.25, size//2 + 0.25)) 
         lmp.command('mass 1 183.84')
 
         lmp.command('mass 2 1.00784')
@@ -122,25 +128,69 @@ class Lammps_Intersitial():
 
 tic = time.perf_counter()
 Instance = Lammps_Intersitial()
-size = 8
-atype = 2
+size = 10
 
-perfect = Instance.Build_Intersitial(size, atype, 'crystalline')
-oct = Instance.Build_Intersitial(size, atype, 'oct')
-tet = Instance.Build_Intersitial(size, atype, 'tet')
+data = { '$E_{oct}$': [] ,
+         '$E_{tet}$': [],
+         '$E_{oct} - E_{tet}$': []}
 
-b_energy = np.array([-8.949, -4.25/2, 0])
-toc = time.perf_counter()
+data = {}
+
+elements = ['W', 'H', 'He']
+
+for i in elements:
+    data['$E_{oct}^{%s}$' % i] = []
+    data['$E_{tet}^{%s}$' % i] = []
+    data['$E_{111}^{%s}$' % i] = []
+    data['$E_{oct}^{%s} - E_{tet}^{%s}$' % (i, i)] = []
+
+for atype in range(1,4):
+    perfect = Instance.Build_Intersitial(size, atype, 'crystalline')
+    oct = Instance.Build_Intersitial(size, atype, 'oct')
+    tet = Instance.Build_Intersitial(size, atype, 'tet')
+    _111 = Instance.Build_Intersitial(size, atype, '111')
+
+    b_energy = np.array([-8.949, -4.25/2, 0])
+
+    if Instance.me == 0:
+
+        oct_int = oct - perfect - b_energy[atype-1]
+        tet_int = tet - perfect - b_energy[atype-1]
+        oct_tet = oct - tet
+        int_111 = _111 - perfect - b_energy[atype-1]
+
+        data['$E_{oct}^{%s}$' % elements[atype-1]].append(oct_int)
+        data['$E_{tet}^{%s}$' % elements[atype-1]].append(tet_int)
+        data['$E_{111}^{%s}$' % elements[atype-1]].append(int_111)
+        data['$E_{oct}^{%s} - E_{tet}^{%s}$' % (elements[atype-1], elements[atype-1])].append(oct_tet)
 
 
 
 if Instance.me == 0:
-    print('Perfect Crystal: %7.3f \n Octahedral Inersitial: %7.3f \n Tetrahedral Intersitial: %7.3f'
-        % (perfect, oct, tet) )
-
-    print('E_oct: %7.3f \n E_tet: %7.3f \n E_oct - E_tet %7.3f'
-        % (oct - perfect - b_energy[atype-1], tet - perfect - b_energy[atype-1], oct - tet ))
-    
+    df = pd.DataFrame(data).transpose()
+    df.to_csv('Data/Defect Analysis/Intersitial_Data.csv')  
+    toc = time.perf_counter()
     print(toc-tic)
+    latex_table = df.to_latex(index=True, float_format="%.2f")
+
+    with open('Data/Defect Analysis/Intersitial_Data.tex', 'w') as f:
+
+        f.write(latex_table)
+
+conv_111 = []
+sizes = np.arange(4,15)
+for s in sizes:
+    perfect = Instance.Build_Intersitial(s, 1, 'crystalline')
+    _111 = Instance.Build_Intersitial(s, 1, '111')
+    int_111 = _111 - perfect - b_energy[0]
+    conv_111.append(int_111)
+
+if Instance.me == 0:
+    plt.plot(sizes, conv_111)
+    plt.title('Convergence of formation energy of <111> intersitial')
+    plt.xlabel('Boxsize')
+    plt.ylabel('Formation Energy')
+    plt.show()
+
 MPI.Finalize()
 
