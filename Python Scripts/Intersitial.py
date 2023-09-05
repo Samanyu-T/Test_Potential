@@ -54,7 +54,7 @@ class Lammps_Intersitial():
 
         potfolder = 'Potentials/Tungsten_Hydrogen_Helium/'
 
-        potfile = potfolder + 'WHHe_new.eam.alloy'
+        potfile = potfolder + 'WHHe_final.eam.alloy'
 
         lmp = lammps()
 
@@ -72,7 +72,7 @@ class Lammps_Intersitial():
 
         lmp.command('region r_simbox block 0 %d 0 %d 0 %d units lattice' % (size, size, size))
                     
-        lmp.command('create_box 2 r_simbox')
+        lmp.command('create_box 3 r_simbox')
         
         lmp.command('create_atoms 1 box')
 
@@ -88,11 +88,11 @@ class Lammps_Intersitial():
 
         lmp.command('mass 2 1.00784')
 
-        #lmp.command('mass 3 4.002602')
+        lmp.command('mass 3 4.002602')
 
         lmp.command('pair_style eam/alloy' )
 
-        lmp.command('pair_coeff * * %s W H' % potfile)
+        lmp.command('pair_coeff * * %s W H He' % potfile)
 
         lmp.command('run 0')
 
@@ -104,7 +104,11 @@ class Lammps_Intersitial():
 
         lmp.command('run 200')
 
-        lmp.command('minimize 1e-5 1e-8 200 1000')
+        lmp.command('minimize 1e-5 1e-8 10 10')
+
+        lmp.command('minimize 1e-5 1e-8 100 100')
+
+        lmp.command('minimize 1e-5 1e-8 100 1000')
 
         lmp.command('compute potential all pe/atom')
 
@@ -115,18 +119,28 @@ class Lammps_Intersitial():
         lmp.close()
 
         return pe
-    
+
+tic = time.perf_counter()
 Instance = Lammps_Intersitial()
-size = 9
+size = 8
 atype = 2
+
 perfect = Instance.Build_Intersitial(size, atype, 'crystalline')
 oct = Instance.Build_Intersitial(size, atype, 'oct')
 tet = Instance.Build_Intersitial(size, atype, 'tet')
 
-print('Perfect Crystal: %7.3f \n Octahedral Inersitial: %7.3f \n Tetrahedral Intersitial: %7.3f'
-       % (perfect, oct, tet) )
+b_energy = np.array([-8.949, -4.25/2, 0])
+toc = time.perf_counter()
 
-print('E_oct: %7.3f \n E_tet: %7.3f \n E_oct - E_tet %7.3f'
-       % (oct - perfect - -8.95, tet - perfect - -8.95, oct - tet ))
+
+
+if Instance.me == 0:
+    print('Perfect Crystal: %7.3f \n Octahedral Inersitial: %7.3f \n Tetrahedral Intersitial: %7.3f'
+        % (perfect, oct, tet) )
+
+    print('E_oct: %7.3f \n E_tet: %7.3f \n E_oct - E_tet %7.3f'
+        % (oct - perfect - b_energy[atype-1], tet - perfect - b_energy[atype-1], oct - tet ))
+    
+    print(toc-tic)
 MPI.Finalize()
 

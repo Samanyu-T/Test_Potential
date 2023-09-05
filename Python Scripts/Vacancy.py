@@ -50,7 +50,11 @@ class Lammps_Vacancy():
         self.comm.barrier()
 
         
-    def Build_Vacancy(self, size, He, H, V):
+    def Build_Vacancy(self, size, n_he, n_h, n_vac):
+
+        potfolder = 'Potentials/Tungsten_Hydrogen_Helium/'
+
+        potfile = potfolder + 'WHHe_final.eam.alloy'
 
         lmp = lammps()
 
@@ -68,11 +72,11 @@ class Lammps_Vacancy():
 
         lmp.command('region r_simbox block 0 %d 0 %d 0 %d units lattice' % (size, size, size))
         
-        lmp.command('create_box 2 r_simbox')
+        lmp.command('create_box 3 r_simbox')
         
         lmp.command('create_atoms 1 box')
 
-        for i in range(V):
+        for i in range(n_vac):
 
             lmp.command('region r_vac_%d sphere %f %f %f 0.1 units lattice' 
                         % (i, size//2 + i/2, size//2 + i/2, size//2 + i/2))
@@ -91,11 +95,11 @@ class Lammps_Vacancy():
 
         lmp.command('mass 2 1.00784')
 
-        #lmp.command('mass 3 4.002602')
+        lmp.command('mass 3 4.002602')
 
         lmp.command('pair_style eam/alloy' )
 
-        lmp.command('pair_coeff * * MNL6_WH.eam.alloy W H')
+        lmp.command('pair_coeff * * %s W H He' % potfile)
 
         lmp.command('run 0')
 
@@ -112,7 +116,6 @@ class Lammps_Vacancy():
         lmp.command('compute potential all pe/atom')
 
         lmp.command('run 0')
-        lmp.command('write_dump all custom Dump/vac_%d.dump id type x y z c_potential modify sort id' % V )
         
         pe = lmp.get_thermo('pe')
 
@@ -122,9 +125,18 @@ class Lammps_Vacancy():
     
 Instance = Lammps_Vacancy()
 
-perfect = Instance.Build_Vacancy(11, 0, 0, 0)
+size  = 10
+n_vac = 3
+n_he  = 0
+n_h   = 0
 
-vacancy = Instance.Build_Vacancy(11, 0, 0, 1)
+b_energy = np.array([-8.949, -4.25/2, 0])
 
-print(perfect - vacancy - -8.949)
+perfect = Instance.Build_Vacancy(size, 0, 0, 0)
+
+vacancy = Instance.Build_Vacancy(size, n_h, n_he, n_vac)
+
+if Instance.me == 0:
+    print(vacancy - perfect + n_vac*b_energy[0] - b_energy[1]*n_h - b_energy[2]*n_he)
+
 MPI.Finalize()
