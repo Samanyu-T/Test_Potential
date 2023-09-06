@@ -1,14 +1,11 @@
 
-import os, sys, shutil, json, glob
+import os
 import time
 import numpy as np
-from scipy.spatial import cKDTree 
 from lammps import lammps
-from ctypes import *
 from mpi4py import MPI
 from itertools import combinations_with_replacement
 import pandas as pd
-from IPython.display import display, Latex
 import matplotlib.pyplot as plt
 
 
