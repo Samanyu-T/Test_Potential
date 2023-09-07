@@ -42,17 +42,15 @@ def cost_function(x, n_vac):
     for i, xi in enumerate(x):
 
         for j, xj in enumerate(x):
-
             if i != j:
-
-                cost += 2/np.linalg.norm(xi - xj)**2
+                cost += 1/np.linalg.norm(xi - xj)**2
             
         cost += np.sum(np.linalg.norm(unit_cube - xi, axis = 1)**2)
 
     return cost
 
-n_vac = 2
-n_atoms = 4
+n_vac = 1
+n_atoms = 3
 
 x0 =  np.random.uniform(low = 0.5, high = 1.5 + (n_vac -1), size = (n_atoms*3,))
 

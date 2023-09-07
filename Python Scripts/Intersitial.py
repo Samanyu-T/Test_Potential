@@ -125,7 +125,7 @@ class Lammps_Intersitial():
 
 tic = time.perf_counter()
 Instance = Lammps_Intersitial()
-size = 10
+size = 7
 
 data = { '$E_{oct}$': [] ,
          '$E_{tet}$': [],
@@ -142,10 +142,10 @@ for i in elements:
     data['$E_{oct}^{%s} - E_{tet}^{%s}$' % (i, i)] = []
 
 for atype in range(1,4):
-    perfect = Instance.Build_Intersitial(size, atype, 'crystalline')
     oct = Instance.Build_Intersitial(size, atype, 'oct')
     tet = Instance.Build_Intersitial(size, atype, 'tet')
     _111 = Instance.Build_Intersitial(size, atype, '111')
+    perfect = Instance.Build_Intersitial(size, atype, 'crystalline')
 
     b_energy = np.array([-8.949, -4.25/2, 0])
 
