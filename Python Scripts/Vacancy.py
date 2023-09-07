@@ -6,72 +6,76 @@ from lammps import lammps
 from mpi4py import MPI
 from itertools import combinations_with_replacement
 from scipy.optimize import minimize, Bounds
-
-def create_cell_vac(n):
-
-    x = []
-
-    if n % np.floor(n) == 0: 
-        n = int(n)
-        for i in range(n):
-            for j in range(n):
-                for k in range(n):
-                    x.append([i,j,k])
-                    if i < n-1 and j < n-1 and k < n-1:
-                        x.append([i + 0.5,j + 0.5, k + 0.5])
-        x = np.array(x)
-
-    else:
-        n_even = int(np.floor(n))
-        for i in range(n_even):
-            for j in range(n_even):
-                for k in range(n_even):
-                    x.append([i,j,k])
-
-        x = np.array(x)
-        x = np.vstack([x, x + 0.5])
+from scipy.spatial import cKDTree
 
 
-    for i in range(int(n*2)-5):
-            mask = np.all(x == i/2 + np.array([1, 1, 1]), axis = 1)
-            mask = np.invert(mask)
-            x = x[mask]
+def create_BCC(n_vac):
+
+    n = n_vac + 1 
+
+    x  = []
+
+    for i in range(n):
+        for j in range(n):
+            for k in range(n):
+
+                x.append([i,j,k])
+                x.append([i+0.5, j+0.5, k+0.5])
+
+    x = np.array(x)
+
+    del_idx = []
+
+    for vac in range(n_vac):
+        matches = np.all(x == (vac + 1)*np.array([0.5, 0.5, 0.5]), axis=1)
+        del_idx.append(np.where(matches)[0][0])
+    
+    x = np.delete(x, del_idx, axis = 0)
+
     return x
 
+def search_space(n_vac):
+    
+    step_size = 0.25
+    box_size  = (1 + n_vac)/2
+    n_samples = int(box_size/step_size) + 1 
 
-def cost_function(x, n_vac):
+    x = np.linspace(0, box_size, n_samples)
+    xx,yy,zz = np.meshgrid(x,x,x)
 
-    x = x.reshape(len(x)//3,3)
-    unit_cube = create_cell_vac(n_vac)
+    xyz = np.hstack([xx.reshape(n_samples**3,1), yy.reshape(n_samples**3,1), zz.reshape(n_samples**3,1)])
 
-    cost = 0
-    for i, xi in enumerate(x):
+    #Ensure that there are no overlaps between Tungsten sites and Search Space
+    bcc = create_BCC(n_vac)
 
-        for j, xj in enumerate(x):
+    del_idx  = []
 
-            if i != j:
+    for i, _xyz in enumerate(xyz):
+        check = np.all(bcc==_xyz, axis = 1)
 
-                cost += 0.5/np.linalg.norm(xi - xj)**2
-            
-        cost += np.sum(np.linalg.norm(unit_cube - xi, axis = 1)**2)
+        if True in check:
+            del_idx.append(i)
 
-    return cost
+    xyz = np.delete(xyz, del_idx, axis = 0)
 
-def initial_guess(n_vac, n_atoms):
+    return xyz
 
-    x0 =  np.random.uniform(low = 0.5, high = 1.5 + (n_vac -1), size = (n_atoms*3,))
 
-    x0 = x0.flatten()
-    bnds = []
+def find_neighbors(xyz):
 
-    for i in range(x0.shape[0]):
-        bnds.append([0.5, 1.5 + (n_vac -1)])
+    kdtree = cKDTree(xyz)
 
-    x_opt = minimize(cost_function, x0=x0,args=(n_vac), method = 'Nelder-Mead' , bounds= bnds)
+    neighbors = kdtree.query_ball_point(xyz , 1/4)
 
-    x_opt = minimize(cost_function, x0=x_opt.x, args = (n_vac), method = 'Nelder-Mead', bounds= bnds)
+    return neighbors
 
-    return x_opt.x.reshape(len(x0)//3, 3) - 0.5
+def acceptance_probability(delta, T):
+
+    if delta < 0:
+        return 1
+    else:
+        return np.exp(-delta/T)
+
 
 # template to replace MPI functionality for single threaded use
 class MPI_to_serial():
@@ -83,8 +87,6 @@ class MPI_to_serial():
     def barrier(self):
 
         return 0
-
-
 
 class Lammps_Vacancy():
 
@@ -113,8 +115,8 @@ class Lammps_Vacancy():
 
         self.comm.barrier()
 
-        
-    def Build_Vacancy(self, size, n_he, n_h, n_vac):
+
+    def Build_Vacancy(self, size, n_h, n_he, n_vac, x_init):
 
         potfolder = 'Potentials/Tungsten_Hydrogen_Helium/'
 
@@ -146,23 +148,16 @@ class Lammps_Vacancy():
                         % (i, size//2 + (i+1)/2, size//2 + (i+1)/2, size//2 + (i+1)/2))
             
             lmp.command('delete_atoms region r_vac_%d ' % i)
-         
+        
+        if n_he + n_h > 0:
 
+            for i in range(n_h):
+                lmp.command('create_atoms 2 single %f %f %f units lattice' 
+                            % ( size//2 + x_init[i ,0], size//2 + x_init[i ,1], size//2 + x_init[i ,2]))   
 
-        #lmp.command('create_atoms 3 single 2.4 2.4 2.4 units lattice')
-            x_init = initial_guess(n_vac, 3)
-
-            print(x_init)
-            
-            lmp.command('create_atoms 3 single %f %f %f units lattice' 
-                        % ( size//2 + x_init[0,0], size//2 + + x_init[0,1], size//2 + + x_init[0,2]))
-            lmp.command('create_atoms 3 single %f %f %f units lattice' 
-                        % ( size//2 + + x_init[1,0], size//2 + + x_init[1,1], size//2 + + x_init[1,2]))
-            lmp.command('create_atoms 3 single %f %f %f units lattice' 
-                        % ( size//2 + + x_init[2,0], size//2 + + x_init[2,1], size//2 + + x_init[2,2]))
-            
-        #lmp.command('create_atoms 3 single 2.6 2.4 2.7 units lattice')
-
+            for i in range(n_he):
+                lmp.command('create_atoms 3 single %f %f %f units lattice' 
+                            % ( size//2 + x_init[i + n_h,0], size//2 + x_init[i + n_h,1], size//2 + x_init[i + n_h,2]))         
 
         lmp.command('mass 1 183.84')
 
@@ -184,6 +179,10 @@ class Lammps_Vacancy():
 
         lmp.command('run 200')
 
+        lmp.command('minimize 1e-5 1e-8 10 10')
+
+        lmp.command('minimize 1e-5 1e-8 100 100')
+
         lmp.command('minimize 1e-5 1e-8 100 1000')
 
         lmp.command('compute potential all pe/atom')
@@ -192,25 +191,84 @@ class Lammps_Vacancy():
         
         pe = lmp.get_thermo('pe')
 
+        lmp.command('write_dump all atom dump.atom')
         lmp.close()
 
         return pe
     
-Instance = Lammps_Vacancy()
+    def simulated_annealing(self, size, n_h, n_he, n_vac, k_max, T0):
+
+        state_space = search_space(n_vac)
+
+        neighbors = find_neighbors(state_space)
+
+        state_idx = np.random.randint(0, len(state_space), n_h + n_he)
+
+        state  = state_space[state_idx]
+
+        temp_state_idx = state_idx
+
+        temp_state  = state
+
+        state_pe = self.Build_Vacancy(size=size, n_h=n_h, n_he=n_he, n_vac=n_vac, x_init=state)
+
+        if self.me == 0:
+            with open('Test_Anneal.txt', 'w') as f:
+                f.write('')
+
+        for k in range(k_max):
+
+            if self.me == 0:
+                with open('Test_Anneal.txt', 'a') as f:
+                    f.write(np.array2string(state) + '\t' + str(state_pe) + '\n')
+
+            T = T0*(1 - (k - 1)/k_max)
+
+            for i_state, s_idx in enumerate(state_idx):
+
+                rand_neighbour = np.random.randint(0, len(neighbors[s_idx]))
+
+                temp_state_idx[i_state] = neighbors[s_idx][rand_neighbour]
+
+                temp_state[i_state] = state_space[temp_state_idx[i_state]]
+            
+            temp_state_pe = self.Build_Vacancy(size=size, n_h=n_h, n_he=n_he, n_vac=n_vac, x_init=temp_state)
+
+            acceptance = acceptance_probability(temp_state_pe - state_pe, T)
+
+            rand_num = np.random.rand(1)
+            
+            if rand_num <= acceptance:
+
+                state = temp_state
+                state_idx = temp_state_idx
+                state_pe = temp_state_pe
+
+        return state, state_pe
+    
 
 size  = 7
 n_vac = 1
 n_he  = 0
-n_h   = 0
+n_h   = 1
+n_atoms = 2*size**3
+
+Instance = Lammps_Vacancy()
 
 b_energy = np.array([-8.949, -4.25/2, 0])
 
-perfect = -8.95*2*size**3 
-perfect = Instance.Build_Vacancy(size, 0, 0, 0)
+k_max = 10
+T0 = 4
 
-vacancy = Instance.Build_Vacancy(size, n_h, n_he, n_vac)
+#perfect = Instance.Build_Vacancy(size = size, n_h=0, n_he=0, n_vac=0, x_init=np.array([[1,0.25,0.5]]))
+#vac_pos, vacancy = Instance.simulated_annealing(size =size, n_h=n_h, n_he=n_he, n_vac=n_vac, k_max=k_max, T0=T0)
+#vacancy = Instance.Build_Vacancy(size = size, n_h=1, n_he=0, n_vac=1, x_init=np.array([[0.5,0.5,0.25]]))
+perfect = n_atoms*b_energy[0]
+perfect2 = Instance.Build_Vacancy(size = size, n_h=n_h, n_he=n_he, n_vac=n_vac, x_init=np.array([[0.5,   0.5 ,0.25]]))
 
 if Instance.me == 0:
-    print(vacancy - perfect + n_vac*b_energy[0] - b_energy[1]*n_h - b_energy[2]*n_he)
+    #print(vacancy - perfect + n_vac*b_energy[0] - b_energy[1]*n_h - b_energy[2]*n_he)
+    print(perfect2, perfect, n_vac*b_energy[0], - b_energy[1]*n_h ,- b_energy[2]*n_he)
+    print(perfect2 - (n_atoms - n_vac)*b_energy[0] - b_energy[1]*n_h - b_energy[2]*n_he)
 
 MPI.Finalize()
