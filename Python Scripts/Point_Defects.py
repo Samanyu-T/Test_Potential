@@ -122,7 +122,6 @@ class Lammps_Point_Defect():
 
                 lmp.command('velocity h_int set %f %f %f sum yes units box' % (0.1, 0.1 , 0.1))
 
-
             lmp.command('run 0')
 
             lmp.command('timestep %f' % 2e-3)
