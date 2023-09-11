@@ -43,9 +43,13 @@ def cost_function(x, n_vac):
 
         for j, xj in enumerate(x):
             if i != j:
+<<<<<<< Updated upstream
+=======
+
+>>>>>>> Stashed changes
                 cost += 1/np.linalg.norm(xi - xj)**2
             
-        cost += np.sum(np.linalg.norm(unit_cube - xi, axis = 1)**2)
+        cost += np.sum(1/np.linalg.norm(unit_cube - xi, axis = 1)**2)
 
     return cost
 

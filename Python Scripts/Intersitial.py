@@ -54,7 +54,7 @@ class Lammps_Intersitial():
 
         potfolder = 'Potentials/Tungsten_Hydrogen_Helium/'
 
-        potfile = potfolder + 'W_H_He.eam.alloy'
+        potfile = potfolder + 'WHHe_final.eam.alloy'
 
         lmp = lammps()
 
@@ -87,6 +87,7 @@ class Lammps_Intersitial():
         elif pos == '111':
             lmp.command('create_atoms %d single %f %f %f units lattice' 
                         % (atype, size//2 + 0.25, size//2 + 0.25, size//2 + 0.25)) 
+            
         lmp.command('mass 1 183.84')
 
         lmp.command('mass 2 1.00784')

@@ -6,6 +6,7 @@ from lammps import lammps
 from mpi4py import MPI
 from itertools import combinations_with_replacement
 from scipy.optimize import minimize, Bounds
+<<<<<<< Updated upstream
 from scipy.spatial import cKDTree
 
 
@@ -76,6 +77,10 @@ def acceptance_probability(delta, T):
     else:
         return np.exp(-delta/T)
 
+=======
+
+
+>>>>>>> Stashed changes
 
 # template to replace MPI functionality for single threaded use
 class MPI_to_serial():
@@ -115,8 +120,13 @@ class Lammps_Vacancy():
 
         self.comm.barrier()
 
+<<<<<<< Updated upstream
 
     def Build_Vacancy(self, size, n_h, n_he, n_vac, x_init):
+=======
+        
+    def Build_Vacancy(self, size, n_h, n_he, n_vac):
+>>>>>>> Stashed changes
 
         potfolder = 'Potentials/Tungsten_Hydrogen_Helium/'
 
@@ -148,6 +158,7 @@ class Lammps_Vacancy():
                         % (i, size//2 + (i + 1)/2, size//2 + (i+1)/2, size//2 + (i+1)/2))
             
             lmp.command('delete_atoms region r_vac_%d ' % i)
+<<<<<<< Updated upstream
         
         if n_he + n_h > 0:
 
@@ -158,6 +169,27 @@ class Lammps_Vacancy():
             for i in range(n_he):
                 lmp.command('create_atoms 3 single %f %f %f units lattice' 
                             % ( size//2 + x_init[i + n_h,0], size//2 + x_init[i + n_h,1], size//2 + x_init[i + n_h,2]))         
+=======
+
+        if n_he + n_h > 0:
+            x_init = np.random.rand(n_he + n_h, 3)
+
+            print(x_init)
+
+        for i in range(n_h):
+            if n_h == 1:            
+                lmp.command('create_atoms 2 single %f %f %f units lattice' 
+                            % ( size//2 + 0.5, size//2 + 0.5, size//2 + 0.25))
+            else:
+                lmp.command('create_atoms 2 single %f %f %f units lattice' 
+                            % ( size//2 + x_init[i,0], size//2 + x_init[i,1], size//2 + x_init[i,2]))
+                
+            
+        for i in range(n_he):
+            lmp.command('create_atoms 3 single %f %f %f units lattice' 
+                        % ( size//2 + x_init[i + n_h,0], size//2 + x_init[i + n_h,1], size//2 + x_init[i + n_h,2]))
+
+>>>>>>> Stashed changes
 
         lmp.command('mass 1 183.84')
 
@@ -252,9 +284,12 @@ n_vac = 1
 n_he  = 0
 n_h   = 1
 n_atoms = 2*size**3
+<<<<<<< Updated upstream
 
 Instance = Lammps_Vacancy()
 
+=======
+>>>>>>> Stashed changes
 b_energy = np.array([-8.949, -4.25/2, 0])
 
 k_max = 10
@@ -267,8 +302,14 @@ pure_vacancy = Instance.Build_Vacancy(size = size, n_h=0, n_he=0, n_vac=n_vac, x
 hydrogen = Instance.Build_Vacancy(size = size, n_h=n_h, n_he=n_he, n_vac=n_vac, x_init=np.array([[0.5,   0.5 ,0.5]]))
 
 if Instance.me == 0:
+<<<<<<< Updated upstream
     print(hydrogen - perfect + n_vac*b_energy[0] - b_energy[1]*n_h - b_energy[2]*n_he)
     print(hydrogen - pure_vacancy - b_energy[1]*n_h - b_energy[2]*n_he)
     #print(vacancy - perfect + n_vac*b_energy[0])
+=======
+    print(vacancy - (n_atoms -n_vac)*b_energy[0] - b_energy[1]*n_h - b_energy[2]*n_he)
+    print(vacancy - perfect + n_vac*b_energy[0] - b_energy[1]*n_h - b_energy[2]*n_he)
+    print(vacancy, perfect)
+>>>>>>> Stashed changes
 
 MPI.Finalize()

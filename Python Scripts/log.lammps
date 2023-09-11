@@ -1,0 +1,23 @@
+LAMMPS (2 Aug 2023)
+# Lammps input file
+units metal
+atom_style atomic
+atom_modify map array sort 0 0.0
+boundary p p p
+lattice bcc 3.144843 orient x 1 0 0 orient y 0 1 0 orient z 0 0 1
+Lattice spacing in x,y,z = 3.144843 3.144843 3.144843
+region r_simbox block 0 10 0 10 0 10 units lattice
+create_box 3 r_simbox
+Created orthogonal box = (0 0 0) to (31.44843 31.44843 31.44843)
+  1 by 1 by 1 MPI processor grid
+create_atoms 1 box
+Created 2000 atoms
+  using lattice units in orthogonal box = (0 0 0) to (31.44843 31.44843 31.44843)
+  create_atoms CPU = 0.000 seconds
+mass 1 183.84
+mass 2 1.00784
+mass 3 4.002602
+pair_style eam/alloy
+pair_coeff * * Potentials/Tungsten_Hydrogen_Helium/WHHe_final.eam.alloy W H He
+ERROR on proc 0: cannot open eam/alloy potential file Potentials/Tungsten_Hydrogen_Helium/WHHe_final.eam.alloy: No such file or directory (src/potential_file_reader.cpp:59)
+Last command: pair_coeff * * Potentials/Tungsten_Hydrogen_Helium/WHHe_final.eam.alloy W H He
