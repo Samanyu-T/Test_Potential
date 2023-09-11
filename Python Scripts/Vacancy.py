@@ -145,7 +145,7 @@ class Lammps_Vacancy():
         for i in range(n_vac):
 
             lmp.command('region r_vac_%d sphere %f %f %f 0.1 units lattice' 
-                        % (i, size//2 + (i+1)/2, size//2 + (i+1)/2, size//2 + (i+1)/2))
+                        % (i, size//2 + (i + 1)/2, size//2 + (i+1)/2, size//2 + (i+1)/2))
             
             lmp.command('delete_atoms region r_vac_%d ' % i)
         
@@ -153,7 +153,7 @@ class Lammps_Vacancy():
 
             for i in range(n_h):
                 lmp.command('create_atoms 2 single %f %f %f units lattice' 
-                            % ( size//2 + x_init[i ,0], size//2 + x_init[i ,1], size//2 + x_init[i ,2]))   
+                            % ( size//2 + x_init[i, 0], size//2 + x_init[i,1], size//2 + x_init[i, 2]))   
 
             for i in range(n_he):
                 lmp.command('create_atoms 3 single %f %f %f units lattice' 
@@ -260,15 +260,15 @@ b_energy = np.array([-8.949, -4.25/2, 0])
 k_max = 10
 T0 = 4
 
-#perfect = Instance.Build_Vacancy(size = size, n_h=0, n_he=0, n_vac=0, x_init=np.array([[1,0.25,0.5]]))
+perfect = Instance.Build_Vacancy(size = size, n_h=0, n_he=0, n_vac=0, x_init=np.array([[1,0.25,0.5]]))
 #vac_pos, vacancy = Instance.simulated_annealing(size =size, n_h=n_h, n_he=n_he, n_vac=n_vac, k_max=k_max, T0=T0)
-#vacancy = Instance.Build_Vacancy(size = size, n_h=1, n_he=0, n_vac=1, x_init=np.array([[0.5,0.5,0.25]]))
-perfect = n_atoms*b_energy[0]
-perfect2 = Instance.Build_Vacancy(size = size, n_h=n_h, n_he=n_he, n_vac=n_vac, x_init=np.array([[0.5,   0.5 ,0.25]]))
+pure_vacancy = Instance.Build_Vacancy(size = size, n_h=0, n_he=0, n_vac=n_vac, x_init=np.array([[0.5,0.5,0.25]]))
+#perfect = n_atoms*b_energy[0]
+hydrogen = Instance.Build_Vacancy(size = size, n_h=n_h, n_he=n_he, n_vac=n_vac, x_init=np.array([[0.5,   0.5 ,0.5]]))
 
 if Instance.me == 0:
-    #print(vacancy - perfect + n_vac*b_energy[0] - b_energy[1]*n_h - b_energy[2]*n_he)
-    print(perfect2, perfect, n_vac*b_energy[0], - b_energy[1]*n_h ,- b_energy[2]*n_he)
-    print(perfect2 - (n_atoms - n_vac)*b_energy[0] - b_energy[1]*n_h - b_energy[2]*n_he)
+    print(hydrogen - perfect + n_vac*b_energy[0] - b_energy[1]*n_h - b_energy[2]*n_he)
+    print(hydrogen - pure_vacancy - b_energy[1]*n_h - b_energy[2]*n_he)
+    #print(vacancy - perfect + n_vac*b_energy[0])
 
 MPI.Finalize()
