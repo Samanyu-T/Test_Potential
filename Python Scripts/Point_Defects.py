@@ -178,31 +178,33 @@ class Lammps_Point_Defect():
 
                     lmp.command('velocity int_%d set %f %f %f sum yes units box' % (element+1,vel[0], vel[1], vel[2]))
             
-            lmp.command('run 0')
+                lmp.command('run 0')
 
-            lmp.command('timestep %f' % 2e-3)
+                lmp.command('timestep %f' % 2e-3)
 
-            lmp.command('thermo 50')
+                lmp.command('thermo 50')
 
-            lmp.command('thermo_style custom step temp pe press') 
+                lmp.command('thermo_style custom step temp pe press') 
 
-            lmp.command('run %d' % t_anneal)
-            
-            lmp.command('minimize 1e-5 1e-8 10 10')
+                lmp.command('run %d' % t_anneal)
+                
+                lmp.command('minimize 1e-5 1e-8 10 10')
 
-            lmp.command('minimize 1e-5 1e-8 10 100')
-            
-            #lmp.command('fix free all box/relax aniso 0.0')
+                lmp.command('minimize 1e-5 1e-8 10 100')
+                
+                #lmp.command('fix free all box/relax aniso 0.0')
 
-            lmp.command('minimize 1e-5 1e-8 100 1000')
+                lmp.command('minimize 1e-5 1e-8 100 1000')
 
-            lmp.command('run 0')
+                lmp.command('run 0')
 
-            lmp.command('write_dump all atom Lammps_Dump/(Vac:%d)(H:%d)(He:%d).atom' % 
-                        (self.n_vac, len(xyz_inter[1]), len(xyz_inter[2])))
+                lmp.command('write_dump all atom Lammps_Dump/(Vac:%d)(H:%d)(He:%d).atom' % 
+                            (self.n_vac, len(xyz_inter[1]), len(xyz_inter[2])))
 
 
         pe = lmp.get_thermo('pe')
+
+        
 
         lmp.close()
 
