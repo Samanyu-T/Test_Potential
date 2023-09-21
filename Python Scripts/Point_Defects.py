@@ -136,13 +136,13 @@ class Lammps_Point_Defect():
 
             lmp.command('pair_coeff * * %s W H He' % self.potfile)
 
-        N_anneal = int(2)
+        N_anneal = int(1)
 
         t_anneal = int(1e2)
 
-        E0 = 5
+        E0 = 0.1
 
-        EN = 1
+        EN = 0.01
 
         constant = (2/(3*8.617333262e-5))
 
@@ -177,7 +177,7 @@ class Lammps_Point_Defect():
                     vel = speed*unit_vel
 
                     lmp.command('velocity int_%d set %f %f %f sum yes units box' % (element+1,vel[0], vel[1], vel[2]))
-            
+                
                 lmp.command('run 0')
 
                 lmp.command('timestep %f' % 2e-3)
@@ -198,13 +198,11 @@ class Lammps_Point_Defect():
 
                 lmp.command('run 0')
 
-                lmp.command('write_dump all atom Lammps_Dump/(Vac:%d)(H:%d)(He:%d).atom' % 
+        lmp.command('write_dump all atom Lammps_Dump/(Vac:%d)(H:%d)(He:%d).atom' % 
                             (self.n_vac, len(xyz_inter[1]), len(xyz_inter[2])))
 
 
         pe = lmp.get_thermo('pe')
-
-        
 
         lmp.close()
 
@@ -355,6 +353,49 @@ def add_intersitial(Instance, element_idx, previous_config, available_sites):
 
     return new_config_pe, new_config, available_sites
 
+
+def add_intersitial_enum(Instance, element_idx, previous_config, available_sites):
+
+    #Initialize lists to store the energies and sites of a test configuration
+    test_config_idx = [[],[]]
+
+    test_config_pe = []
+
+    for site_type_idx in range(len(available_sites)):
+
+        for test_site_idx, test_site in enumerate(available_sites[site_type_idx]):
+
+            test_config = copy.deepcopy(previous_config)
+
+            test_config[element_idx].append(test_site)
+
+            #Use LAMMPs to determine the Potential of this configuration
+            test_config_pe.append(Instance.Build_Defect(test_config))
+
+            test_config_idx[0].append(site_type_idx)
+            test_config_idx[1].append(test_site_idx)
+        
+        
+    test_config_pe = np.array(test_config_pe)
+
+    #Choose the Config which minimizes the energy of the system
+    min_pe_idx = int(np.argmin(test_config_pe))
+
+    new_config = copy.deepcopy(previous_config)
+
+    print(test_config_idx[0][min_pe_idx], test_config_idx[0][min_pe_idx], len(test_config_idx[0]), len(test_config_pe))
+
+    #Add the new site to the config
+    new_config[element_idx].append(available_sites[test_config_idx[0][min_pe_idx]][test_config_idx[1][min_pe_idx]].tolist())
+
+    new_config_pe = np.min(test_config_pe)
+
+    #Remove the chosen site from the available sites
+    available_sites[test_config_idx[0][min_pe_idx]] = np.delete(available_sites[test_config_idx[0][min_pe_idx]], 
+                                                                test_config_idx[1][min_pe_idx], axis= 0)
+
+    return new_config_pe, new_config, available_sites
+
 def sequential_clustering(Instance, n_vac, element_idx, max_occupancy, init_config = [[], [], []]):
 
     Instance.n_vac = 0
@@ -404,7 +445,7 @@ perfect = Instance.Build_Defect()
 
 h_int   = Instance.Build_Defect([[],[available_sites[1][0]], []])
 
-Instance.n_vac = 2
+Instance.n_vac = 1
 
 vacancy = Instance.Build_Defect()
 
@@ -424,21 +465,27 @@ data['energy'] = {}
 
 data['config'] = {}
 
-# data = Element_in_Vacancy(Instance, element_idx=2, max_intersitials=6)
-data['energy']['He_x + He'], data['config']['He_x + He'],  = sequential_clustering(Instance,n_vac = 0,
-                                                       element_idx=2, max_occupancy=6, init_config=[[], [],[]])
+tet = available_sites[1][0]
 
-data['energy']['VHe_x + He'], data['config']['VHe_x + He'] = sequential_clustering(Instance,n_vac = 1, 
-                                                                                 element_idx=2, max_occupancy=7, init_config=[[],[],[]])
+available_sites[1] = np.delete(available_sites[1], 0, axis = 0)
 
-data['energy']['V_2He_x + He'], data['config']['V_2He_x + He'] = sequential_clustering(Instance,n_vac = 2,
-                                                                                  element_idx=2, max_occupancy=7, init_config=[[],[],[]])
+test = add_intersitial_enum(Instance, 1, [[],[tet],[]], available_sites)
 
-data['energy']['H_x + H'], data['config']['H_x + H'],  = sequential_clustering(Instance,n_vac = 0,
-                                                       element_idx=1, max_occupancy=6, init_config=[[], [],[]])
+# # data = Element_in_Vacancy(Instance, element_idx=2, max_intersitials=6)
+# data['energy']['He_x + He'], data['config']['He_x + He'],  = sequential_clustering(Instance,n_vac = 0,
+#                                                        element_idx=2, max_occupancy=6, init_config=[[], [],[]])
 
-data['energy']['VH_x + H'], data['config']['VH_x + H'],  = sequential_clustering(Instance,n_vac = 1,
-                                                       element_idx=1, max_occupancy=6, init_config=[[], [],[]])
+# data['energy']['VHe_x + He'], data['config']['VHe_x + He'] = sequential_clustering(Instance,n_vac = 1, 
+#                                                                                  element_idx=2, max_occupancy=7, init_config=[[],[],[]])
+
+# data['energy']['V_2He_x + He'], data['config']['V_2He_x + He'] = sequential_clustering(Instance,n_vac = 2,
+#                                                                                   element_idx=2, max_occupancy=7, init_config=[[],[],[]])
+
+# data['energy']['H_x + H'], data['config']['H_x + H'],  = sequential_clustering(Instance,n_vac = 0,
+#                                                        element_idx=1, max_occupancy=6, init_config=[[], [],[]])
+
+# data['energy']['VH_x + H'], data['config']['VH_x + H'],  = sequential_clustering(Instance,n_vac = 1,
+#                                                        element_idx=1, max_occupancy=6, init_config=[[], [],[]])
 
 
 
@@ -453,6 +500,6 @@ if Instance.me == 0:
     # file_path = 'Data/Defect Analysis/Helium_in_Vacancy_%s.json' % pot_type
     # with open(file_path, "w") as json_file:
     #     json.dump(data, json_file, indent=4)  # indent for pretty formatting (optional)
-    print(data['energy'])
+    print(test)
 
 
