@@ -24,7 +24,7 @@ class MPI_to_serial():
 
 class Lammps_Point_Defect():
 
-    def __init__(self, size, n_vac, n_inter, potential_type):
+    def __init__(self, size, n_vac, potential_type):
 
         # try running in parallel, otherwise single thread
         try:
@@ -51,7 +51,6 @@ class Lammps_Point_Defect():
 
         self.size  = int(size)
         self.n_vac = int(n_vac)
-        self.n_inter = n_inter
         self.pot_type = potential_type
 
         if potential_type == 'Wang':
@@ -68,9 +67,9 @@ class Lammps_Point_Defect():
 
             self.potfolder = 'Potentials/Tungsten_Hydrogen_Helium/'
 
-            self.potfile = self.potfolder + 'WHHe_final.eam.alloy'
+            self.potfile = self.potfolder + 'WHHe_test.eam.alloy'
 
-    def Build_Defect(self, xyz_inter = [[], [], []]):
+    def Build_Defect(self, xyz_inter = [[], [], []], alattice = 3.14484257):
 
         ''' xyz_inter gives a list of the intersitial atoms for each species i,e W H He in that order
             they are in lattice units and are consistent with the Lammps co-ords of the cell'''
@@ -87,7 +86,7 @@ class Lammps_Point_Defect():
 
         lmp.command('boundary p p p')
 
-        lmp.command('lattice bcc %f orient x 1 0 0 orient y 0 1 0 orient z 0 0 1' % 3.14484257)
+        lmp.command('lattice bcc %f orient x 1 0 0 orient y 0 1 0 orient z 0 0 1' % alattice)
 
         lmp.command('region r_simbox block 0 %d 0 %d 0 %d units lattice' % (self.size, self.size, self.size))
                     
@@ -109,15 +108,11 @@ class Lammps_Point_Defect():
             for xyz in xyz_element:
                 lmp.command('create_atoms %d single %f %f %f units lattice' % (element + 1, xyz[0], xyz[1], xyz[2]))
 
-        rng_num = np.random.randint(low = 0, high = 10000)
-
         lmp.command('mass 1 183.84')
 
         lmp.command('mass 2 1.00784')
 
         lmp.command('mass 3 4.002602')
-
-        mass = 1.03499e-4* np.array([183.84, 10.00784, 4.002602])
 
         if self.pot_type == 'Wang':
 
@@ -136,77 +131,110 @@ class Lammps_Point_Defect():
 
             lmp.command('pair_coeff * * %s W H He' % self.potfile)
 
-        N_anneal = int(1)
+        # mass = 1.03499e-4* np.array([183.84, 10.00784, 4.002602])
 
-        t_anneal = int(1e2)
+        # N_anneal = int(5)
 
-        E0 = 0.1
+        # t_anneal = int(1e2)
 
-        EN = 0.01
+        # E0 = 1
 
-        constant = (2/(3*8.617333262e-5))
+        # EN = 0.1
 
-        T0 = constant*E0
+        # constant = (2/(3*8.617333262e-5))
 
-        TN = constant*EN
+        # T0 = constant*E0
 
-        decay_constant = (1/N_anneal)*np.log(T0/TN)
+        # TN = constant*EN
 
-        for i in range(N_anneal):
+        # decay_constant = (1/N_anneal)*np.log(T0/TN)
 
-            for element in range(len(xyz_inter)):
+        # for i in range(N_anneal):
+            
+        #     rng_num = np.random.randint(low = 0, high = 10000)
+
+        #     for element in range(len(xyz_inter)):
                 
-                lmp.command('group int_%d type %d' % (element+1, element+1))
+        #         lmp.command('group int_%d type %d' % (element+1, element+1))
 
-                if len(xyz_inter[element]) > 1:
+        #         if len(xyz_inter[element]) > 1:
 
-                    T = T0*np.exp(-decay_constant*i)
+        #             T = T0*np.exp(-decay_constant*i)
 
-                    lmp.command('velocity int_%d create %f %d dist gaussian mom yes rot no units box' % (element+1 ,T, rng_num) )
+        #             lmp.command('velocity int_%d create %f %d dist gaussian mom yes rot no units box' % (element+1 ,T, rng_num) )
                 
-                elif len(xyz_inter[element]) == 1:
+        #         elif len(xyz_inter[element]) == 1:
 
-                    E = E0*np.exp(-decay_constant*i)
+        #             E = E0*np.exp(-decay_constant*i)
 
-                    speed = np.sqrt(2*E/mass[element])
+        #             speed = np.sqrt(2*E/mass[element])
 
-                    unit_vel = np.hstack( [np.random.randn(1), np.random.randn(1), np.random.randn(1)] )
+        #             unit_vel = np.hstack( [np.random.randn(1), np.random.randn(1), np.random.randn(1)] )
 
-                    unit_vel /= np.linalg.norm(unit_vel)
+        #             unit_vel /= np.linalg.norm(unit_vel)
 
-                    vel = speed*unit_vel
+        #             vel = speed*unit_vel
 
-                    lmp.command('velocity int_%d set %f %f %f sum yes units box' % (element+1,vel[0], vel[1], vel[2]))
+        #             lmp.command('velocity int_%d set %f %f %f sum yes units box' % (element+1,vel[0], vel[1], vel[2]))
                 
-                lmp.command('run 0')
+        #         lmp.command('run 0')
 
-                lmp.command('timestep %f' % 2e-3)
+        #         lmp.command('timestep %f' % 2e-3)
 
-                lmp.command('thermo 50')
+        #         lmp.command('thermo 50')
 
-                lmp.command('thermo_style custom step temp pe press') 
+        #         lmp.command('thermo_style custom step temp pe press') 
 
-                lmp.command('run %d' % t_anneal)
+        #         lmp.command('run %d' % t_anneal)
                 
-                lmp.command('minimize 1e-5 1e-8 10 10')
+        #         lmp.command('minimize 1e-5 1e-8 10 10')
 
-                lmp.command('minimize 1e-5 1e-8 10 100')
+        #         lmp.command('minimize 1e-5 1e-8 10 100')
                 
-                #lmp.command('fix free all box/relax aniso 0.0')
+        #         #lmp.command('fix free all box/relax aniso 0.0')
 
-                lmp.command('minimize 1e-5 1e-8 100 1000')
+        #         lmp.command('minimize 1e-5 1e-8 100 1000')
 
-                lmp.command('run 0')
+        #         lmp.command('run 0')
 
+        lmp.command('run 0')
+
+        lmp.command('thermo 50')
+
+        lmp.command('thermo_style custom step temp pe press')
+
+        lmp.command('minimize 1e-15 1e-18 10 10')
+
+        lmp.command('minimize 1e-15 1e-18 10 100')
+
+        lmp.command('minimize 1e-15 1e-18 100 1000')
+        
         lmp.command('write_dump all atom Lammps_Dump/(Vac:%d)(H:%d)(He:%d).atom' % 
-                            (self.n_vac, len(xyz_inter[1]), len(xyz_inter[2])))
+                    (self.n_vac, len(xyz_inter[1]), len(xyz_inter[2])))
 
 
         pe = lmp.get_thermo('pe')
 
+        xyz_system = np.array(lmp.gather_atoms('x',1,3))
+
+        xyz_system = xyz_system.reshape(len(xyz_system)//3,3)
+
+        xyz_inter_relaxed = [[],[],[]]
+
+        N_atoms = 2*self.size**3 - self.n_vac
+
+        idx = 0
+
+        for element, xyz_element in enumerate(xyz_inter):
+            for i in range(len(xyz_element)):
+                vec = (xyz_system[N_atoms + idx]/alattice)
+                xyz_inter_relaxed[element].append(vec.tolist())
+                idx += 1
+
+
         lmp.close()
 
-        return pe
+        return pe, xyz_inter_relaxed
     
     def get_octahedral_sites(self):
 
@@ -292,143 +320,125 @@ class Lammps_Point_Defect():
         return np.array(central_sites)
     
     def get_all_sites(self):
-        oct =  Instance.size//2 + Instance.get_octahedral_sites()
 
-        tet = Instance.size//2 + Instance.get_tetrahedral_sites()
+        sites = {}
 
-        diag = Instance.size//2 + Instance.get_diagonal_sites()
+        sites['oct'] =  self.size//2 + self.get_octahedral_sites()
 
-        central = Instance.size//2 + Instance.get_central_sites()
+        sites['tet'] = self.size//2 + self.get_tetrahedral_sites()
 
-        return [oct, tet, diag, central]
+        sites['diag'] = self.size//2 + self.get_diagonal_sites()
 
+        sites['central'] = self.size//2 + self.get_central_sites()
 
-def add_intersitial(Instance, element_idx, previous_config, available_sites):
+        return sites
 
-    #Initialize lists to store the energies and sites of a test configuration
-    test_config_idx = [0 for i in range(len(available_sites))]
+def minimize_single_intersitial(Instance, element_idx):
 
-    test_config_pe = np.zeros(shape=(len(available_sites) ,))
+    energy_lst = []
 
-    for site_type_idx in range(len(available_sites)):
+    type_lst = []
 
-        if len(available_sites[site_type_idx]) > 0:
-            
-            #Initialize an array to store the distance between previous sites and the potentially available sites
-            distance = np.zeros(shape= (len(available_sites[site_type_idx]),) )
+    relaxed_lst = []
 
-            #Loop through each occupied site and find the distance between the occupied site and an available ite
-            for prev_site_idx in range(len(previous_config[element_idx])):
+    available_sites = Instance.get_all_sites()
 
-                prev_site_element = np.array(previous_config[element_idx][prev_site_idx])
+    for site_type in available_sites:
 
-                distance += np.linalg.norm(available_sites[site_type_idx] - prev_site_element, axis = 1)
-            
-            #Test the site which maximally distant from previously occupied sites
-            test_config_idx[site_type_idx] = int(np.argmax(distance))
+        test_site = [[],[],[]]
+        
+        if len(available_sites[site_type]) > 0:
+            test_site[element_idx].append(available_sites[site_type][0])
 
-            test_config = copy.deepcopy(previous_config)
+            energy, relaxed = Instance.Build_Defect(test_site)
 
-            test_config[element_idx].append(available_sites[site_type_idx][int(np.argmax(distance))])
+            energy_lst.append(energy)
 
-            #Use LAMMPs to determine the Potential of this configuration
-            test_config_pe[site_type_idx] = Instance.Build_Defect(test_config)
+            type_lst.append(site_type)
+
+            relaxed_lst.append(relaxed)
         
         else:
+            energy_lst.append(np.inf)
 
-            test_config_pe[site_type_idx] = np.inf
-            
-    #Choose the Config which minimizes the energy of the system
-    min_pe_idx = int(np.argmin(test_config_pe))
-
-    new_config = copy.deepcopy(previous_config)
-
-    #Add the new site to the config
-    new_config[element_idx].append(available_sites[min_pe_idx][test_config_idx[min_pe_idx]].tolist())
-
-    new_config_pe = np.min(test_config_pe)
-
-    #Remove the chosen site from the available sites
-    available_sites[min_pe_idx] = np.delete(available_sites[min_pe_idx], test_config_idx[min_pe_idx], axis= 0)
-
-    return new_config_pe, new_config, available_sites
-
-
-def add_intersitial_enum(Instance, element_idx, previous_config, available_sites):
-
-    #Initialize lists to store the energies and sites of a test configuration
-    test_config_idx = [[],[]]
-
-    test_config_pe = []
-
-    for site_type_idx in range(len(available_sites)):
-
-        for test_site_idx, test_site in enumerate(available_sites[site_type_idx]):
-
-            test_config = copy.deepcopy(previous_config)
-
-            test_config[element_idx].append(test_site)
-
-            #Use LAMMPs to determine the Potential of this configuration
-            test_config_pe.append(Instance.Build_Defect(test_config))
-
-            test_config_idx[0].append(site_type_idx)
-            test_config_idx[1].append(test_site_idx)
+            type_lst.append(site_type)
         
-        
-    test_config_pe = np.array(test_config_pe)
 
-    #Choose the Config which minimizes the energy of the system
-    min_pe_idx = int(np.argmin(test_config_pe))
 
-    new_config = copy.deepcopy(previous_config)
+    energy_arr = np.array(energy_lst)
 
-    print(test_config_idx[0][min_pe_idx], test_config_idx[0][min_pe_idx], len(test_config_idx[0]), len(test_config_pe))
+    min_energy_idx = np.argmin(energy_arr)
 
-    #Add the new site to the config
-    new_config[element_idx].append(available_sites[test_config_idx[0][min_pe_idx]][test_config_idx[1][min_pe_idx]].tolist())
+    xyz_init = [[],[],[]]
 
-    new_config_pe = np.min(test_config_pe)
+    xyz_init[element_idx].append(available_sites[type_lst[min_energy_idx]][0])    
 
-    #Remove the chosen site from the available sites
-    available_sites[test_config_idx[0][min_pe_idx]] = np.delete(available_sites[test_config_idx[0][min_pe_idx]], 
-                                                                test_config_idx[1][min_pe_idx], axis= 0)
+    return energy_lst[min_energy_idx], xyz_init, relaxed_lst[min_energy_idx]
 
-    return new_config_pe, new_config, available_sites
+def check_proximity(xyz_init, test_site):
 
-def sequential_clustering(Instance, n_vac, element_idx, max_occupancy, init_config = [[], [], []]):
+    for xyz_element in xyz_init:
+        for vec in xyz_element:
+            distance = np.linalg.norm(test_site - vec)
+            if distance < 0.1:
+                return False
+    
+    return True
 
-    Instance.n_vac = 0
 
-    perfect = Instance.Build_Defect()
+
+    
+def minimize_add_intersitial(Instance, element_idx, xyz_init):
+
+    energy_lst = []
+
+    type_lst = []
+
+    idx_lst = []
+
+    relaxed_lst = []
 
     available_sites = Instance.get_all_sites()
 
-    intersitial, _, __ = add_intersitial(Instance, element_idx, [[], [], []], available_sites)
+    for site_type in available_sites:
 
-    defect_energies =[]
-    defect_config   = []
+        for idx, site in enumerate(available_sites[site_type]):
 
-    Instance.n_vac = n_vac
+            valid = check_proximity(xyz_init, site)
 
-    available_sites = Instance.get_all_sites()
+            test_site = copy.deepcopy(xyz_init)
 
-    defect_energies.append(Instance.Build_Defect(init_config))
+            test_site[element_idx].append(site)
 
+            if valid:
 
-    for i in range(max_occupancy):
+                energy, relaxed = Instance.Build_Defect(test_site)
 
-        defect_energy, init_config, available_sites = add_intersitial(Instance, element_idx, init_config, available_sites)
+            else:
 
-        defect_config.append(init_config)
+                energy = np.inf
 
-        defect_energies.append(defect_energy)
+                relaxed = copy.deepcopy(test_site)
 
-    defect_energies = np.array(defect_energies)
+            energy_lst.append(energy)
 
-    binding_energies = intersitial - perfect - np.diff(defect_energies) 
+            type_lst.append(site_type)
 
-    return binding_energies, defect_config
+            idx_lst.append(idx)
+
+            relaxed_lst.append(relaxed)
+
+    energy_arr = np.array(energy_lst)
+
+    energy_arr = np.nan_to_num(energy_arr)
+
+    min_energy_idx = np.argmin(energy_arr)
+
+    xyz_init_new = copy.deepcopy(xyz_init)
+
+    xyz_init_new[element_idx].append(available_sites[type_lst[min_energy_idx]][idx_lst[min_energy_idx]].tolist())    
+
+    return energy_lst[min_energy_idx], xyz_init_new, relaxed_lst[min_energy_idx]
 
 
 size = 7
@@ -437,69 +447,89 @@ b_energy = np.array([-8.949, -4.25/2, 0])
 
 pot_type = 'Daniel'
 
-Instance = Lammps_Point_Defect(size, 0, 0, pot_type)
-
-available_sites = Instance.get_all_sites()
+Instance = Lammps_Point_Defect(size, 0, pot_type)
 
 perfect = Instance.Build_Defect()
 
-h_int   = Instance.Build_Defect([[],[available_sites[1][0]], []])
-
 Instance.n_vac = 1
-
-vacancy = Instance.Build_Defect()
-
-available_sites = Instance.get_all_sites()
-
-intersitial_sites = [[], [available_sites[1][0]], []]
-
-Instance.n_inter = np.array([len(element) for element in intersitial_sites])
-
-defect = Instance.Build_Defect(intersitial_sites)
-
-N_atoms = 2*size**3
 
 data = {}
 
-data['energy'] = {}
+for n_vac in range(3):
 
-data['config'] = {}
+    Instance.n_vac = n_vac
+    
+    vac_energy, _ = Instance.Build_Defect()
 
-tet = available_sites[1][0]
+    data['V_%dH_%dHe_%d' % (n_vac, 0, 0)] = {}
 
-available_sites[1] = np.delete(available_sites[1], 0, axis = 0)
+    data['V_%dH_%dHe_%d' % (n_vac, 0, 0)]['energy_opt'] = vac_energy
 
-test = add_intersitial_enum(Instance, 1, [[],[tet],[]], available_sites)
+    data['V_%dH_%dHe_%d' % (n_vac, 0, 0)]['xyz_opt']    = [[],[],[]]
 
-# # data = Element_in_Vacancy(Instance, element_idx=2, max_intersitials=6)
-# data['energy']['He_x + He'], data['config']['He_x + He'],  = sequential_clustering(Instance,n_vac = 0,
-#                                                        element_idx=2, max_occupancy=6, init_config=[[], [],[]])
+    for element_idx in [1,2]:
 
-# data['energy']['VHe_x + He'], data['config']['VHe_x + He'] = sequential_clustering(Instance,n_vac = 1, 
-#                                                                                  element_idx=2, max_occupancy=7, init_config=[[],[],[]])
+        for i in range(1,7):
 
-# data['energy']['V_2He_x + He'], data['config']['V_2He_x + He'] = sequential_clustering(Instance,n_vac = 2,
-#                                                                                   element_idx=2, max_occupancy=7, init_config=[[],[],[]])
+            if element_idx == 1:
+                h_key = i
+                he_key = 0
 
-# data['energy']['H_x + H'], data['config']['H_x + H'],  = sequential_clustering(Instance,n_vac = 0,
-#                                                        element_idx=1, max_occupancy=6, init_config=[[], [],[]])
+            elif element_idx == 2:
+                h_key = 0
+                he_key = i
 
-# data['energy']['VH_x + H'], data['config']['VH_x + H'],  = sequential_clustering(Instance,n_vac = 1,
-#                                                        element_idx=1, max_occupancy=6, init_config=[[], [],[]])
+            energy_opt, xyz_init, xyz_opt = minimize_add_intersitial(Instance, element_idx,
+                                            data['V_%dH_%dHe_%d' % (
+                                                                    n_vac, 
+                                                                    np.clip(h_key - 1, a_min= 0, a_max=None),
+                                                                    np.clip(he_key - 1, a_min= 0, a_max=None)
+                                                                   )
+                                                ]
+                                                ['xyz_opt']
+                                                                    )
+            
+
+            data['V_%dH_%dHe_%d' % (n_vac, h_key, he_key)] = {}
+
+            data['V_%dH_%dHe_%d' % (n_vac, h_key, he_key)]['energy_opt'] = energy_opt
+
+            data['V_%dH_%dHe_%d' % (n_vac, h_key, he_key)]['xyz_opt']    = copy.deepcopy(xyz_opt)
+
+with open('Data/Defect Analysis/data_new.json', 'w') as file:
+    json.dump(data, file, indent=4)
+
+with open('Data/Defect Analysis/data_new.json', 'r') as file:
+    data = json.load(file)
+
+n_vac = 0
+
+Instance.n_vac = n_vac
+
+for h_key in range(1,7):
+    for he_key in range(1,7):
+
+
+        energy_opt, xyz_init, xyz_opt = minimize_add_intersitial(Instance, 1,
+                                        data['V_%dH_%dHe_%d' % (
+                                                                n_vac, 
+                                                                np.clip(h_key - 1, a_min= 0, a_max=None),
+                                                                he_key
+                                                                )
+                                            ]
+                                            ['xyz_opt']
+                                                                )
+
+        data['V_%dH_%dHe_%d' % (n_vac, h_key, he_key)] = {}
+
+        data['V_%dH_%dHe_%d' % (n_vac, h_key, he_key)]['energy_opt'] = energy_opt
+
+        data['V_%dH_%dHe_%d' % (n_vac, h_key, he_key)]['xyz_opt']    = copy.deepcopy(xyz_opt)
 
 
 
 if Instance.me == 0:
 
-    # #print(defect -  perfect*((N_atoms-1)/N_atoms) - np.dot(Instance.n_inter  ,b_energy))
-    # print(defect - vacancy - h_int + perfect)
-    # print('H + Vacancy',defect, 'H Intersitial' , h_int,'Vacancy' ,vacancy,'Perfect', perfect,'Gas in Vacuum', np.dot(Instance.n_inter  ,b_energy))
-    # print('Vacancy',vacancy - perfect - 8.949)
-    # print('H-Intersitial',h_int - perfect - np.dot(Instance.n_inter  ,b_energy))
-
-    # file_path = 'Data/Defect Analysis/Helium_in_Vacancy_%s.json' % pot_type
-    # with open(file_path, "w") as json_file:
-    #     json.dump(data, json_file, indent=4)  # indent for pretty formatting (optional)
-    print(test)
-
+    with open('Data/Defect Analysis/data_wang.json', 'w') as file:
+        json.dump(data, file, indent=4)
 

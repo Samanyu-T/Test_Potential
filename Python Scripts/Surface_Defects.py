@@ -466,5 +466,6 @@ for i in range(10):
 
 energy_lst = np.array(energy_lst)
 
-print(energy_lst - perfect + 2.125)
+if Instance.me == 0:
+    print(energy_lst - perfect + 2.125)
 
