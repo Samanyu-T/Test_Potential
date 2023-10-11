@@ -1,0 +1,35 @@
+units metal 
+
+atom_style atomic
+
+atom_modify map array sort 0 0.0
+
+read_data Migration_Data/init.data
+
+mass 1 183.84
+
+mass 2 1.00784
+
+mass 3 4.002602
+
+pair_style eam/alloy
+
+pair_coeff * * Potentials/Tungsten_Hydrogen_Helium/WHHe_test.eam.alloy W H He
+
+thermo 10
+
+run 0
+
+fix 1 all neb 1e-4
+
+timestep 1e-3
+
+min_style quickmin
+
+thermo 100 
+
+variable i equal part
+
+neb 10e-8 10e-10 5000 5000 100 final Migration_Data/final_neb.dump
+
+write_dump all custom Migration_Data/neb.$i.dump id type x y z

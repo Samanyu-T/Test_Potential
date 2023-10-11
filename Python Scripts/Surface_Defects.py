@@ -133,72 +133,6 @@ class Lammps_Point_Defect():
 
             lmp.command('pair_coeff * * %s W H He' % self.potfile)
 
-        # mass = 1.03499e-4* np.array([183.84, 10.00784, 4.002602])
-
-        # N_anneal = int(5)
-
-        # t_anneal = int(1e2)
-
-        # E0 = 1
-
-        # EN = 0.1
-
-        # constant = (2/(3*8.617333262e-5))
-
-        # T0 = constant*E0
-
-        # TN = constant*EN
-
-        # decay_constant = (1/N_anneal)*np.log(T0/TN)
-
-        # for i in range(N_anneal):
-            
-        #     rng_num = np.random.randint(low = 0, high = 10000)
-
-        #     for element in range(len(xyz_inter)):
-                
-        #         lmp.command('group int_%d type %d' % (element+1, element+1))
-
-        #         if len(xyz_inter[element]) > 1:
-
-        #             T = T0*np.exp(-decay_constant*i)
-
-        #             lmp.command('velocity int_%d create %f %d dist gaussian mom yes rot no units box' % (element+1 ,T, rng_num) )
-                
-        #         elif len(xyz_inter[element]) == 1:
-
-        #             E = E0*np.exp(-decay_constant*i)
-
-        #             speed = np.sqrt(2*E/mass[element])
-
-        #             unit_vel = np.hstack( [np.random.randn(1), np.random.randn(1), np.random.randn(1)] )
-
-        #             unit_vel /= np.linalg.norm(unit_vel)
-
-        #             vel = speed*unit_vel
-
-        #             lmp.command('velocity int_%d set %f %f %f sum yes units box' % (element+1,vel[0], vel[1], vel[2]))
-                
-        #         lmp.command('run 0')
-
-        #         lmp.command('timestep %f' % 2e-3)
-
-        #         lmp.command('thermo 50')
-
-        #         lmp.command('thermo_style custom step temp pe press') 
-
-        #         lmp.command('run %d' % t_anneal)
-                
-        #         lmp.command('minimize 1e-5 1e-8 10 10')
-
-        #         lmp.command('minimize 1e-5 1e-8 10 100')
-                
-        #         #lmp.command('fix free all box/relax aniso 0.0')
-
-        #         lmp.command('minimize 1e-5 1e-8 100 1000')
-
-        #         lmp.command('run 0')
-
         lmp.command('run 0')
 
         lmp.command('thermo 50')
@@ -336,6 +270,97 @@ class Lammps_Point_Defect():
             sites['central'] = offset + Instance.get_central_sites()
 
         return sites
+    
+
+    def Create_Animation(self, xyz_inter = [[], [], []], alattice = 3.14484257):
+
+        ''' xyz_inter gives a list of the intersitial atoms for each species i,e W H He in that order
+            they are in lattice units and are consistent with the Lammps co-ords of the cell'''
+
+        lmp = lammps()
+
+        lmp.command('# Lammps input file')
+
+        lmp.command('units metal')
+
+        lmp.command('atom_style atomic')
+
+        lmp.command('atom_modify map array sort 0 0.0')
+
+        lmp.command('boundary p p p')
+
+        lmp.command('lattice bcc %f orient x 1 0 0 orient y 0 1 0 orient z 0 0 1' % alattice)
+
+        lmp.command('region r_simbox block 0 %d 0 %d 0 %d units lattice' % (self.size, self.size, self.size + 10))
+
+        lmp.command('region r_atombox block 0 %d 0 %d 0 %d units lattice' % (self.size, self.size, self.size))
+                    
+        lmp.command('create_box 3 r_simbox')
+        
+        lmp.command('create_atoms 1 region r_atombox')
+
+        #Create a Vacancy of n-atoms along the <1,1,1> direction the vacancy will be at the centre of the cell
+
+        for i in range(self.n_vac):
+            lmp.command('region r_vac_%d sphere %f %f %f 0.1 units lattice' 
+                        % (i, self.size//2 + (i + 1)/2, self.size//2 + (i+1)/2, self.size//2 + (i+1)/2))
+            
+            lmp.command('delete_atoms region r_vac_%d ' % i)
+
+        #Create the set of intersitials
+
+        for element, xyz_element in enumerate(xyz_inter):
+            for xyz in xyz_element:
+                lmp.command('create_atoms %d single %f %f %f units lattice' % (element + 1, xyz[0], xyz[1], xyz[2]))
+
+        lmp.command('mass 1 183.84')
+
+        lmp.command('mass 2 1.00784')
+
+        lmp.command('mass 3 4.002602')
+
+        if self.pot_type == 'Wang':
+
+            lmp.command('pair_style hybrid/overlay eam/alloy zbl 1.4 1.8 zbl 0.9 1.5 zbl 0.2 0.35 lj/cut 7.913 table spline 10000 table spline 10000')
+            lmp.command('pair_coeff      * *  eam/alloy  %s W H  NULL' % self.potfile_WH)
+            lmp.command('pair_coeff 1 1 zbl 1 74.0 74.0')
+            lmp.command('pair_coeff 2 2 zbl 3 1.0 1.0')
+            lmp.command('pair_coeff 1 2 zbl 2 74.0 1.0')
+            lmp.command('pair_coeff      2 3 lj/cut 5.9225e-4 1.333')
+            lmp.command('pair_coeff      3 3 table 1 %s HeHe' % self.potfile_He)
+            lmp.command('pair_coeff      1 3 table 2 %s WHe'  % self.potfile_WHe)
+
+        else:
+
+            lmp.command('pair_style eam/alloy' )
+
+            lmp.command('pair_coeff * * %s W H He' % self.potfile)
+
+        lmp.command('run 0')
+
+        lmp.command('thermo 50')
+
+        lmp.command('compute pot all pe/atom')
+
+        lmp.command('compute ke all ke/atom')
+
+
+        lmp.command('thermo_style custom step temp pe pxx pyy pzz pxy pxz pyz')
+
+        lmp.command('dump myDump all custom 1 Animation/animation.*.dump id type x y z c_pot c_ke')
+
+        lmp.command('timestep 1e-3')
+
+        lmp.command('min_style quickmin')
+
+        lmp.command('minimize 1e-15 1e-18 10 10')
+
+        lmp.command('minimize 1e-15 1e-18 10 100')
+
+        lmp.command('minimize 1e-15 1e-18 500 1000')
+
+        lmp.close()
+
 
 def minimize_single_intersitial(Instance, element_idx, depth):
 
@@ -469,3 +494,6 @@ energy_lst = np.array(energy_lst)
 if Instance.me == 0:
     print(energy_lst - perfect + 2.125)
 
+site = [3.25, 3.5, 8]
+
+Instance.Create_Animation([[],[site],[]])

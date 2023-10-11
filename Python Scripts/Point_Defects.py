@@ -68,8 +68,11 @@ class Lammps_Point_Defect():
             self.potfolder = 'Potentials/Tungsten_Hydrogen_Helium/'
 
             self.potfile = self.potfolder + 'WHHe_test.eam.alloy'
+        
+        self.Perfect_Crystal()
 
-    def Build_Defect(self, xyz_inter = [[], [], []], alattice = 3.14484257):
+
+    def Perfect_Crystal(self, alattice = 3.14484257):
 
         ''' xyz_inter gives a list of the intersitial atoms for each species i,e W H He in that order
             they are in lattice units and are consistent with the Lammps co-ords of the cell'''
@@ -94,10 +97,89 @@ class Lammps_Point_Defect():
         
         lmp.command('create_atoms 1 box')
 
+        lmp.command('mass 1 183.84')
+
+        lmp.command('mass 2 1.00784')
+
+        lmp.command('mass 3 4.002602')
+
+        if self.pot_type == 'Wang':
+
+            lmp.command('pair_style hybrid/overlay eam/alloy zbl 1.4 1.8 zbl 0.9 1.5 zbl 0.2 0.35 lj/cut 7.913 table spline 10000 table spline 10000')
+            lmp.command('pair_coeff      * *  eam/alloy  %s W H  NULL' % self.potfile_WH)
+            lmp.command('pair_coeff 1 1 zbl 1 74.0 74.0')
+            lmp.command('pair_coeff 2 2 zbl 3 1.0 1.0')
+            lmp.command('pair_coeff 1 2 zbl 2 74.0 1.0')
+            lmp.command('pair_coeff      2 3 lj/cut 5.9225e-4 1.333')
+            lmp.command('pair_coeff      3 3 table 1 %s HeHe' % self.potfile_He)
+            lmp.command('pair_coeff      1 3 table 2 %s WHe'  % self.potfile_WHe)
+
+        else:
+
+            lmp.command('pair_style eam/alloy' )
+
+            lmp.command('pair_coeff * * %s W H He' % self.potfile)
+
+        lmp.command('fix 3 all box/relax  aniso 0.0')
+
+        lmp.command('run 0')
+
+        lmp.command('thermo 5')
+
+        lmp.command('thermo_style custom step temp pe pxx pyy pzz pxy pxz pyz vol')
+        
+        lmp.command('minimize 1e-9 1e-12 100 1000')
+
+        lmp.command('write_data Elastic_Data/perfect.data')
+        
+        lmp.command('write_dump all atom Elastic_Data/disp.0.dump')
+
+        pxx = lmp.get_thermo('pxx')
+        pyy = lmp.get_thermo('pyy')
+        pzz = lmp.get_thermo('pzz')
+        pxy = lmp.get_thermo('pxy')
+        pxz = lmp.get_thermo('pxz')
+        pyz = lmp.get_thermo('pyz')
+
+        self.stress0 = np.array([pxx, pyy, pzz, pxy, pxz, pyz]) 
+        
+        self.alattice = (lmp.get_thermo('xhi') - lmp.get_thermo('xlo'))/self.size
+
+        self.pe0 = lmp.get_thermo('pe')
+
+        self.vol0 = lmp.get_thermo('vol')
+
+        lmp.close()
+
+    def Build_Defect(self, xyz_inter = [[], [], []], alattice = 3.14484257):
+
+        ''' xyz_inter gives a list of the intersitial atoms for each species i,e W H He in that order
+            they are in lattice units and are consistent with the Lammps co-ords of the cell'''
+
+        lmp = lammps()
+
+        lmp.command('# Lammps input file')
+
+        lmp.command('units metal')
+
+        lmp.command('atom_style atomic')
+
+        lmp.command('atom_modify map array sort 0 0.0')
+
+        lmp.command('boundary p p p')
+
+        lmp.command('lattice bcc %f orient x 1 0 0 orient y 0 1 0 orient z 0 0 1' % self.alattice)
+
+        lmp.command('region r_simbox block 0 %d 0 %d 0 %d units lattice' % (self.size, self.size, self.size))
+                    
+        lmp.command('create_box 3 r_simbox')
+        
+        lmp.command('create_atoms 1 box')
+
         #Create a Vacancy of n-atoms along the <1,1,1> direction the vacancy will be at the centre of the cell
 
         for i in range(self.n_vac):
-            lmp.command('region r_vac_%d sphere %f %f %f 0.1 units lattice' 
+            lmp.command('region r_vac_%d sphere %f %f %f 0.2 units lattice' 
                         % (i, self.size//2 + (i + 1)/2, self.size//2 + (i+1)/2, self.size//2 + (i+1)/2))
             
             lmp.command('delete_atoms region r_vac_%d ' % i)
@@ -131,77 +213,13 @@ class Lammps_Point_Defect():
 
             lmp.command('pair_coeff * * %s W H He' % self.potfile)
 
-        # mass = 1.03499e-4* np.array([183.84, 10.00784, 4.002602])
-
-        # N_anneal = int(5)
-
-        # t_anneal = int(1e2)
-
-        # E0 = 1
-
-        # EN = 0.1
-
-        # constant = (2/(3*8.617333262e-5))
-
-        # T0 = constant*E0
-
-        # TN = constant*EN
-
-        # decay_constant = (1/N_anneal)*np.log(T0/TN)
-
-        # for i in range(N_anneal):
-            
-        #     rng_num = np.random.randint(low = 0, high = 10000)
-
-        #     for element in range(len(xyz_inter)):
-                
-        #         lmp.command('group int_%d type %d' % (element+1, element+1))
-
-        #         if len(xyz_inter[element]) > 1:
-
-        #             T = T0*np.exp(-decay_constant*i)
-
-        #             lmp.command('velocity int_%d create %f %d dist gaussian mom yes rot no units box' % (element+1 ,T, rng_num) )
-                
-        #         elif len(xyz_inter[element]) == 1:
-
-        #             E = E0*np.exp(-decay_constant*i)
-
-        #             speed = np.sqrt(2*E/mass[element])
-
-        #             unit_vel = np.hstack( [np.random.randn(1), np.random.randn(1), np.random.randn(1)] )
-
-        #             unit_vel /= np.linalg.norm(unit_vel)
-
-        #             vel = speed*unit_vel
-
-        #             lmp.command('velocity int_%d set %f %f %f sum yes units box' % (element+1,vel[0], vel[1], vel[2]))
-                
-        #         lmp.command('run 0')
-
-        #         lmp.command('timestep %f' % 2e-3)
-
-        #         lmp.command('thermo 50')
-
-        #         lmp.command('thermo_style custom step temp pe press') 
-
-        #         lmp.command('run %d' % t_anneal)
-                
-        #         lmp.command('minimize 1e-5 1e-8 10 10')
-
-        #         lmp.command('minimize 1e-5 1e-8 10 100')
-                
-        #         #lmp.command('fix free all box/relax aniso 0.0')
-
-        #         lmp.command('minimize 1e-5 1e-8 100 1000')
-
-        #         lmp.command('run 0')
-
         lmp.command('run 0')
 
         lmp.command('thermo 50')
 
-        lmp.command('thermo_style custom step temp pe press')
+        lmp.command('thermo_style custom step temp pe pxx pyy pzz pxy pxz pyz vol')
+
+        # lmp.command('fix 3 all box/relax  aniso 0.0')
 
         lmp.command('minimize 1e-15 1e-18 10 10')
 
@@ -209,6 +227,24 @@ class Lammps_Point_Defect():
 
         lmp.command('minimize 1e-15 1e-18 100 1000')
         
+        pe = lmp.get_thermo('pe')
+
+        pxx = lmp.get_thermo('pxx')
+        pyy = lmp.get_thermo('pyy')
+        pzz = lmp.get_thermo('pzz')
+        pxy = lmp.get_thermo('pxy')
+        pxz = lmp.get_thermo('pxz')
+        pyz = lmp.get_thermo('pyz')
+
+        self.vol = lmp.get_thermo('vol')
+
+        self.stress_voigt = np.array([pxx, pyy, pzz, pxy, pxz, pyz]) - self.stress0
+
+        self.strain_tensor = self.find_strain()
+
+        self.relaxation_volume = 2*np.trace(self.strain_tensor)*self.vol/self.alattice**3
+        # self.relaxation_volume = 2*(self.vol - self.vol0)/self.alattice**3
+
         lmp.command('write_dump all atom Lammps_Dump/(Vac:%d)(H:%d)(He:%d).atom' % 
                     (self.n_vac, len(xyz_inter[1]), len(xyz_inter[2])))
 
@@ -234,7 +270,9 @@ class Lammps_Point_Defect():
 
         lmp.close()
 
-        return pe, xyz_inter_relaxed
+        e0 = self.pe0/(2*self.size**3)
+
+        return pe - self.pe0 + self.n_vac*e0 + len(xyz_inter[1])*2.121, xyz_inter_relaxed
     
     def get_octahedral_sites(self):
 
@@ -332,6 +370,37 @@ class Lammps_Point_Defect():
         sites['central'] = self.size//2 + self.get_central_sites()
 
         return sites
+    
+    def find_strain(self):
+
+        C11 = 3.201
+        C12 = 1.257
+        C44 = 1.020
+
+        C = np.array( [
+            [C11, C12, C12, 0, 0, 0],
+            [C12, C11, C12, 0, 0, 0],
+            [C12, C12, C11, 0, 0, 0],
+            [0, 0, 0, C44, 0, 0],
+            [0, 0, 0, 0, C44, 0],
+            [0, 0, 0, 0, 0, C44]
+        ])
+
+        conversion = 1.602177e2
+
+        C = conversion*C
+
+        stress = self.stress_voigt*1e-4
+
+        self.strain_voigt = np.linalg.solve(C, stress)
+
+        strain_tensor = np.array( [ 
+            [self.strain_voigt[0], self.strain_voigt[3]/2, self.strain_voigt[4]/2],
+            [self.strain_voigt[3]/2, self.strain_voigt[1], self.strain_voigt[5]/2],
+            [self.strain_voigt[4]/2, self.strain_voigt[5]/2, self.strain_voigt[2]]
+        ])
+
+        return strain_tensor
 
 def minimize_single_intersitial(Instance, element_idx):
 
@@ -384,9 +453,6 @@ def check_proximity(xyz_init, test_site):
                 return False
     
     return True
-
-
-
     
 def minimize_add_intersitial(Instance, element_idx, xyz_init):
 
@@ -451,7 +517,12 @@ Instance = Lammps_Point_Defect(size, 0, pot_type)
 
 perfect = Instance.Build_Defect()
 
+Instance.stress0 = Instance.stress_voigt
+
 Instance.n_vac = 1
+
+vac, _ = Instance.Build_Defect()
+
 
 data = {}
 
@@ -461,11 +532,15 @@ for n_vac in range(3):
     
     vac_energy, _ = Instance.Build_Defect()
 
-    data['V_%dH_%dHe_%d' % (n_vac, 0, 0)] = {}
+    data['V%dH%dHe%d' % (n_vac, 0, 0)] = {}
 
-    data['V_%dH_%dHe_%d' % (n_vac, 0, 0)]['energy_opt'] = vac_energy
+    data['V%dH%dHe%d' % (n_vac, 0, 0)]['energy_opt'] = vac_energy
 
-    data['V_%dH_%dHe_%d' % (n_vac, 0, 0)]['xyz_opt']    = [[],[],[]]
+    data['V%dH%dHe%d' % (n_vac, 0, 0)]['xyz_opt']    = [[],[],[]]
+
+    data['V%dH%dHe%d' % (n_vac, 0, 0)]['strain_tensor']    = Instance.strain_tensor.tolist()
+
+    data['V%dH%dHe%d' % (n_vac, 0, 0)]['relaxation_volume']    = Instance.relaxation_volume
 
     for element_idx in [1,2]:
 
@@ -480,21 +555,28 @@ for n_vac in range(3):
                 he_key = i
 
             energy_opt, xyz_init, xyz_opt = minimize_add_intersitial(Instance, element_idx,
-                                            data['V_%dH_%dHe_%d' % (
+                                            data['V%dH%dHe%d' % (
                                                                     n_vac, 
                                                                     np.clip(h_key - 1, a_min= 0, a_max=None),
                                                                     np.clip(he_key - 1, a_min= 0, a_max=None)
                                                                    )
                                                 ]
-                                                ['xyz_opt']
+                                                ['xyz_opt']   
+
+
+                                                
                                                                     )
             
 
-            data['V_%dH_%dHe_%d' % (n_vac, h_key, he_key)] = {}
+            data['V%dH%dHe%d' % (n_vac, h_key, he_key)] = {}
 
-            data['V_%dH_%dHe_%d' % (n_vac, h_key, he_key)]['energy_opt'] = energy_opt
+            data['V%dH%dHe%d' % (n_vac, h_key, he_key)]['energy_opt'] = energy_opt
 
-            data['V_%dH_%dHe_%d' % (n_vac, h_key, he_key)]['xyz_opt']    = copy.deepcopy(xyz_opt)
+            data['V%dH%dHe%d' % (n_vac, h_key, he_key)]['xyz_opt']    = copy.deepcopy(xyz_opt)
+
+            data['V%dH%dHe%d' % (n_vac, h_key, he_key)]['strain_tensor']       = Instance.strain_tensor.tolist()
+
+            data['V%dH%dHe%d' % (n_vac, h_key, he_key)]['relaxation_volume']   = Instance.relaxation_volume
 
 with open('Data/Defect Analysis/data_new.json', 'w') as file:
     json.dump(data, file, indent=4)
@@ -504,32 +586,35 @@ with open('Data/Defect Analysis/data_new.json', 'r') as file:
 
 n_vac = 0
 
-Instance.n_vac = n_vac
+for n_vac in range(2):
+    Instance.n_vac = n_vac
 
-for h_key in range(1,7):
-    for he_key in range(1,7):
+    for h_key in range(1,7):
+        for he_key in range(1,7):
 
 
-        energy_opt, xyz_init, xyz_opt = minimize_add_intersitial(Instance, 1,
-                                        data['V_%dH_%dHe_%d' % (
-                                                                n_vac, 
-                                                                np.clip(h_key - 1, a_min= 0, a_max=None),
-                                                                he_key
-                                                                )
-                                            ]
-                                            ['xyz_opt']
-                                                                )
+            energy_opt, xyz_init, xyz_opt = minimize_add_intersitial(Instance, 1,
+                                            data['V%dH%dHe%d' % (
+                                                                    n_vac, 
+                                                                    np.clip(h_key - 1, a_min= 0, a_max=None),
+                                                                    he_key
+                                                                    )
+                                                ]
+                                                ['xyz_opt']
+                                                                    )
 
-        data['V_%dH_%dHe_%d' % (n_vac, h_key, he_key)] = {}
+            data['V%dH%dHe%d' % (n_vac, h_key, he_key)] = {}
 
-        data['V_%dH_%dHe_%d' % (n_vac, h_key, he_key)]['energy_opt'] = energy_opt
+            data['V%dH%dHe%d' % (n_vac, h_key, he_key)]['energy_opt'] = energy_opt
 
-        data['V_%dH_%dHe_%d' % (n_vac, h_key, he_key)]['xyz_opt']    = copy.deepcopy(xyz_opt)
+            data['V%dH%dHe%d' % (n_vac, h_key, he_key)]['xyz_opt']    = copy.deepcopy(xyz_opt)
 
+            data['V%dH%dHe%d' % (n_vac, h_key, he_key)]['strain_tensor']       = Instance.strain_tensor.tolist()
+
+            data['V%dH%dHe%d' % (n_vac, h_key, he_key)]['relaxation_volume']   = Instance.relaxation_volume
 
 
 if Instance.me == 0:
 
-    with open('Data/Defect Analysis/data_wang.json', 'w') as file:
+    with open('Data/Defect Analysis/point_defects_formations.json', 'w') as file:
         json.dump(data, file, indent=4)
-

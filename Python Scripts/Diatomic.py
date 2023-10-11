@@ -134,7 +134,7 @@ class Lammps_Diatomic():
 
         lmp.command('pair_style eam/alloy')
 
-        lmp.command('pair_coeff * * Potentials/Tungsten_Hydrogen_Helium/WHHe_final.eam.alloy W H He')
+        lmp.command('pair_coeff * * Potentials/Tungsten_Hydrogen_Helium/WHHe_test.eam.alloy W H He')
 
         lmp.command('run 0')
 
@@ -147,9 +147,9 @@ class Lammps_Diatomic():
 
 
 Instance = Lammps_Diatomic()
-N = 100
-#x = np.linspace(0.5,4,N)
-x = np.logspace(-6,1,N)
+N = 500
+x = np.linspace(0.5,4,N)
+# x = np.logspace(-6,1,N)
 pe_overlay = np.zeros(N)
 pe_eam = np.zeros(N)
 
@@ -157,12 +157,12 @@ for [i,j] in combinations_with_replacement([1, 2, 3],2):
 
     for idx, _x in enumerate(x):
 
-        #pe_overlay[idx] = Instance.Build_Diatomic(i, j, _x, idx)
+        pe_overlay[idx] = Instance.Build_Diatomic(i, j, _x, idx)
 
         pe_eam[idx] = Instance.Build_Diatomic_EAM(i, j, _x, idx)
 
-    np.savetxt('Data/Distance.txt', x)
-    np.savetxt('Data/EAM_%d%d.txt' % (i, j), pe_eam)
-    #np.savetxt('Data/Overlay_%d%d.txt' %(i, j), pe_overlay)
+    np.savetxt('Data/Diatomic Plots/Distance.txt', x)
+    np.savetxt('Data/Diatomic Plots/EAM_%d%d.txt' % (i, j), pe_eam)
+    np.savetxt('Data/Diatomic Plots/Overlay_%d%d.txt' %(i, j), pe_overlay)
 
 MPI.Finalize()

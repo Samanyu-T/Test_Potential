@@ -1,0 +1,164 @@
+LAMMPS (2 Aug 2023)
+Processor partition = 3
+units metal
+
+atom_style atomic
+
+atom_modify map array sort 0 0.0
+
+read_data Migration_Data/init.data
+Reading data file ...
+  orthogonal box = (0 0 0) to (22.013901 22.013901 22.013901)
+  1 by 1 by 1 MPI processor grid
+  reading atoms ...
+  687 atoms
+  reading velocities ...
+  687 velocities
+  read_data CPU = 0.008 seconds
+
+mass 1 183.84
+
+mass 2 1.00784
+
+mass 3 4.002602
+
+pair_style eam/alloy
+
+pair_coeff * * Potentials/Tungsten_Hydrogen_Helium/WHHe_test.eam.alloy W H He
+
+thermo 10
+
+run 0
+WARNING: No fixes with time integration, atoms won't move (src/verlet.cpp:60)
+Neighbor list info ...
+  update: every = 1 steps, delay = 0 steps, check = yes
+  max neighbors/atom: 2000, page size: 100000
+  master list distance cutoff = 6.8513889
+  ghost atom cutoff = 6.8513889
+  binsize = 3.4256945, bins = 7 7 7
+  1 neighbor lists, perpetual/occasional/extra = 1 0 0
+  (1) pair eam/alloy, perpetual
+      attributes: half, newton on
+      pair build: half/bin/atomonly/newton
+      stencil: half/bin/3d
+      bin: standard
+Per MPI rank memory allocation (min/avg/max) = 3.306 | 3.306 | 3.306 Mbytes
+   Step          Temp          E_pair         E_mol          TotEng         Press     
+         0   0             -6132.7716      0             -6132.7716      706.84118    
+Loop time of 3.75e-07 on 1 procs for 0 steps with 687 atoms
+
+0.0% CPU use with 1 MPI tasks x no OpenMP threads
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0          | 0          | 0          |   0.0 |  0.00
+Neigh   | 0          | 0          | 0          |   0.0 |  0.00
+Comm    | 0          | 0          | 0          |   0.0 |  0.00
+Output  | 0          | 0          | 0          |   0.0 |  0.00
+Modify  | 0          | 0          | 0          |   0.0 |  0.00
+Other   |            | 3.75e-07   |            |       |100.00
+
+Nlocal:            687 ave         687 max         687 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:           2373 ave        2373 max        2373 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:          23264 ave       23264 max       23264 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 23264
+Ave neighs/atom = 33.863173
+Neighbor list builds = 0
+Dangerous builds = 0
+
+fix 1 all neb 1e-4
+
+timestep 1e-3
+
+min_style quickmin
+
+thermo 100
+
+variable i equal part
+
+neb 10e-8 10e-10 5000 5000 100 final Migration_Data/final_neb.dump
+Per MPI rank memory allocation (min/avg/max) = 3.306 | 3.306 | 3.306 Mbytes
+   Step          Temp          E_pair         E_mol          TotEng         Press     
+         0   0             -6131.4263      0             -6131.4263      831.29465    
+        52   0.18534472    -6132.5447      0             -6132.5283      634.34523    
+Loop time of 0.0493551 on 1 procs for 52 steps with 687 atoms
+
+96.1% CPU use with 1 MPI tasks x no OpenMP threads
+
+Minimization stats:
+  Stopping criterion = energy tolerance
+  Energy initial, next-to-last, final = 
+     -6131.42627803654  -6132.54432830204  -6132.54474809985
+  Force two-norm initial, final = 7.8591592 0.31984787
+  Force max component initial, final = 5.1221099 0.072296796
+  Final line search alpha, max atom move = 0 0
+  Iterations, force evaluations = 52 52
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.034326   | 0.034326   | 0.034326   |   0.0 | 69.55
+Neigh   | 0          | 0          | 0          |   0.0 |  0.00
+Comm    | 0.00067321 | 0.00067321 | 0.00067321 |   0.0 |  1.36
+Output  | 0          | 0          | 0          |   0.0 |  0.00
+Modify  | 0.012634   | 0.012634   | 0.012634   |   0.0 | 25.60
+Other   |            | 0.001722   |            |       |  3.49
+
+Nlocal:            687 ave         687 max         687 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:           2373 ave        2373 max        2373 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:          23183 ave       23183 max       23183 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 23183
+Ave neighs/atom = 33.745269
+Neighbor list builds = 0
+Dangerous builds = 0
+Per MPI rank memory allocation (min/avg/max) = 3.306 | 3.306 | 3.306 Mbytes
+   Step          Temp          E_pair         E_mol          TotEng         Press     
+        52   0             -6132.5447      0             -6132.5447      632.69974    
+        58   0.015158396   -6132.5452      0             -6132.5438      631.36047    
+Loop time of 0.00755704 on 1 procs for 6 steps with 687 atoms
+
+99.9% CPU use with 1 MPI tasks x no OpenMP threads
+
+Minimization stats:
+  Stopping criterion = energy tolerance
+  Energy initial, next-to-last, final = 
+     -6132.54474809985  -6132.54506475765  -6132.54517677879
+  Force two-norm initial, final = 0.31984788 0.31066604
+  Force max component initial, final = 0.072306884 0.069393794
+  Final line search alpha, max atom move = 0 0
+  Iterations, force evaluations = 6 6
+
+MPI task timing breakdown:
+Section |  min time  |  avg time  |  max time  |%varavg| %total
+---------------------------------------------------------------
+Pair    | 0.0023294  | 0.0023294  | 0.0023294  |   0.0 | 30.82
+Neigh   | 0          | 0          | 0          |   0.0 |  0.00
+Comm    | 3.7083e-05 | 3.7083e-05 | 3.7083e-05 |   0.0 |  0.49
+Output  | 0          | 0          | 0          |   0.0 |  0.00
+Modify  | 0.0045805  | 0.0045805  | 0.0045805  |   0.0 | 60.61
+Other   |            | 0.0006101  |            |       |  8.07
+
+Nlocal:            687 ave         687 max         687 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Nghost:           2373 ave        2373 max        2373 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+Neighs:          23196 ave       23196 max       23196 min
+Histogram: 1 0 0 0 0 0 0 0 0 0
+
+Total # of neighbors = 23196
+Ave neighs/atom = 33.764192
+Neighbor list builds = 0
+Dangerous builds = 0
+
+write_dump all custom Migration_Data/neb.$i.dump id type x y z
+write_dump all custom Migration_Data/neb.3.dump id type x y z
+Total wall time: 0:00:00

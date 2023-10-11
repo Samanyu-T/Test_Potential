@@ -70,6 +70,10 @@ class Lammps_Point_Defect():
 
             self.potfile = self.potfolder + 'WHHe_test.eam.alloy'
 
+    def mpiprint(self, string):
+        if self.me == 0:
+            print(string)
+
     def Build_Defect(self, save_name, xyz_inter = [[], [], []], alattice = 3.14484257):
 
         ''' xyz_inter gives a list of the intersitial atoms for each species i,e W H He in that order
@@ -142,7 +146,7 @@ class Lammps_Point_Defect():
 
         lmp.command('minimize 1e-5 1e-8 10 100')
 
-        lmp.command('minimize 1e-5 1e-8 100 1000')
+        lmp.command('minimize 1e-9 1e-12 100 1000')
         
         lmp.command('write_data Migration_Data/%s.data' % save_name)
         
@@ -162,7 +166,7 @@ class Lammps_Point_Defect():
 
         for element, xyz_element in enumerate(xyz_inter):
             for i in range(len(xyz_element)):
-                vec = (xyz_system[N_atoms + idx]/alattice)
+                vec = (xyz_system[N_atoms + idx])
                 xyz_inter_relaxed[element].append(vec.tolist())
                 idx += 1
 
@@ -268,7 +272,11 @@ class Lammps_Point_Defect():
 
         return sites
     
-    def Interpolate(self, init, final, N = 10):
+    def Interpolate(self,file_name, init_pos, final_pos, N = 10):
+
+        init_pos = np.array(init_pos)
+
+        final_pos = np.array(final_pos)
 
         lmp = lammps()
 
@@ -276,71 +284,16 @@ class Lammps_Point_Defect():
 
         lmp.command('atom_style atomic')
 
-        lmp.command('read_data Migration_Data/%s.data' % init)
+        lmp.command('atom_modify map array sort 0 0.0')
 
-        init_xyz = np.array(lmp.gather_atoms('x', 1, 3))
+        lmp.command('read_data Migration_Data/%s.data' % file_name)
 
-        lmp.close()
-
-        lmp = lammps()
-
-        lmp.command('units metal')
-
-        lmp.command('atom_style atomic')
-
-        lmp.command('read_data Migration_Data/%s.data' % final)
-        
-        final_xyz = np.array(lmp.gather_atoms('x', 1, 3))
-
-        lmp.close()
-
-        init_xyz = init_xyz.reshape(len(init_xyz)//3,3)
-
-        final_xyz = final_xyz.reshape(len(final_xyz)//3,3)
-
-        for i in range(1, N):
-
-            lmp = lammps()
-
-            lmp.command('units metal')
-
-            lmp.command('atom_style atomic')
-
-            lmp.command('read_data Migration_Data/%s.data' % init)
-
-            interpolate_xyz = init_xyz + (i/N)*(final_xyz - init_xyz)
-
-            interpolate_xyz = interpolate_xyz.flatten()
-
-            N = len(interpolate_xyz)
-            
-            x_ctypes = (N * ctypes.c_double)()
-
-            x_ctypes[:] = interpolate_xyz
-            
-            lmp.scatter_atoms('x', 1, 3, x_ctypes)
-
-            lmp.command('write_data Migration_Data/interpolate.%d.data' % i)
-
-            lmp.close()
-
-
-    def Migration_Energies(self, init, final):
-
-        lmp = lammps(cmdargs=['-p', '4x1'])
-
-        lmp.command('units metal')
-
-        lmp.command('atom_style atomic')
-
-        lmp.command('read_data Migration_Data/%s.data' % init)
-
-        # lmp.command('read_data Migration_Data/%s.data add append' % final)
-
+        lmp.command('group hydrogen type %d' % 3)
+    
         lmp.command('mass 1 183.84')
 
         lmp.command('mass 2 1.00784')
-        
+
         lmp.command('mass 3 4.002602')
 
         if self.pot_type == 'Wang':
@@ -360,17 +313,37 @@ class Lammps_Point_Defect():
 
             lmp.command('pair_coeff * * %s W H He' % self.potfile)
 
-        lmp.command('timestep 0.01')
+        lmp.command('run 0')
 
-        lmp.command('min_style fire')
+        xyz = np.array(lmp.gather_atoms('x', 1, 3))
 
-        lmp.command('variable i equal part')
+        pe  = lmp.get_thermo('pe')
 
-        lmp.command('fix 1 all neb 1.0')
+        if self.me == 0:
+            with open('Migration_Data/interpolation_energies.txt', 'w') as f:
+                f.write('%f %f %f %f \n' % (xyz[-3], xyz[-2], xyz[-1], pe))
 
-        lmp.command('neb 0.0 0.001 1000 500 50 final Migration_Data/%s.data' % final)
+        for i in range(N):
 
-size = 5
+            disp_pos = (final_pos - init_pos)/N
+
+            lmp.command('displace_atoms hydrogen move %f %f %f units box' %
+                        (disp_pos[0], disp_pos[1], disp_pos[2]))
+            
+            lmp.command('run 0')
+
+            lmp.command('write_dump all custom Migration_Data/interpolate.%d.dump id x y z' % i)
+
+            pe = lmp.get_thermo('pe')
+
+            xyz = np.array(lmp.gather_atoms('x', 1, 3))
+
+            if self.me == 0:
+                with open('Migration_Data/interpolation_energies.txt', 'a') as f:
+                    f.write('%d %f %f %f %f \n' % (i, xyz[-3], xyz[-2], xyz[-1], pe))
+        lmp.close()
+
+size = 7
 
 n_vac = 0
 
@@ -382,6 +355,28 @@ tet = Instance.get_tetrahedral_sites() + size//2
 
 oct = Instance.get_octahedral_sites() + size//2
 
-Instance.Build_Defect('init', xyz_inter=[[],[tet[0]], []])
+pe_init, relaxed_init = Instance.Build_Defect('init', xyz_inter=[[],[], [tet[0]]])
 
-Instance.Build_Defect('final', xyz_inter=[[],[tet[3]], []])
+pe_final, relaxed_final = Instance.Build_Defect('final', xyz_inter=[[],[], [tet[3]]])
+
+# N = 6
+
+# Instance.Interpolate('init', relaxed_init[1][0], relaxed_final[1][0], N)
+
+# for i in range(N):
+#     with open('Migration_Data/interpolate.%d.dump' % i, 'r') as src:
+#         src_lines = src.readlines()
+    
+#     with open('Migration_Data/interpolate_neb.%d.dump' % i, 'w') as dest:
+#         dest.writelines(src_lines[9:])
+
+with open('Migration_Data/final.dump', 'r') as src:
+    src_lines = src.readlines()
+
+with open('Migration_Data/final_neb.dump', 'w') as dest:
+    dest.write('%d \n' % int(2*size**3+1))
+    dest.writelines(src_lines[9:])
+
+if Instance.me == 0:
+    print(pe_init,relaxed_init)
+    print(pe_final, relaxed_final)
