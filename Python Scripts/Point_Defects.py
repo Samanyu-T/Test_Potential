@@ -402,122 +402,114 @@ class Lammps_Point_Defect():
 
         return strain_tensor
 
-def minimize_single_intersitial(Instance, element_idx):
+    def minimize_single_intersitial(self, element_idx):
 
-    energy_lst = []
+        energy_lst = []
 
-    type_lst = []
+        type_lst = []
 
-    relaxed_lst = []
+        relaxed_lst = []
 
-    available_sites = Instance.get_all_sites()
+        available_sites = self.get_all_sites()
 
-    for site_type in available_sites:
+        for site_type in available_sites:
 
-        test_site = [[],[],[]]
-        
-        if len(available_sites[site_type]) > 0:
-            test_site[element_idx].append(available_sites[site_type][0])
+            test_site = [[],[],[]]
+            
+            if len(available_sites[site_type]) > 0:
+                test_site[element_idx].append(available_sites[site_type][0])
 
-            energy, relaxed = Instance.Build_Defect(test_site)
+                energy, relaxed = self.Build_Defect(test_site)
 
-            energy_lst.append(energy)
+                energy_lst.append(energy)
 
-            type_lst.append(site_type)
+                type_lst.append(site_type)
 
-            relaxed_lst.append(relaxed)
-        
-        else:
-            energy_lst.append(np.inf)
-
-            type_lst.append(site_type)
-        
-
-
-    energy_arr = np.array(energy_lst)
-
-    min_energy_idx = np.argmin(energy_arr)
-
-    xyz_init = [[],[],[]]
-
-    xyz_init[element_idx].append(available_sites[type_lst[min_energy_idx]][0])    
-
-    return energy_lst[min_energy_idx], xyz_init, relaxed_lst[min_energy_idx]
-
-def check_proximity(xyz_init, test_site):
-
-    for xyz_element in xyz_init:
-        for vec in xyz_element:
-            distance = np.linalg.norm(test_site - vec)
-            if distance < 0.1:
-                return False
-    
-    return True
-    
-def minimize_add_intersitial(Instance, element_idx, xyz_init):
-
-    energy_lst = []
-
-    type_lst = []
-
-    idx_lst = []
-
-    relaxed_lst = []
-
-    available_sites = Instance.get_all_sites()
-
-    for site_type in available_sites:
-
-        for idx, site in enumerate(available_sites[site_type]):
-
-            valid = check_proximity(xyz_init, site)
-
-            test_site = copy.deepcopy(xyz_init)
-
-            test_site[element_idx].append(site)
-
-            if valid:
-
-                energy, relaxed = Instance.Build_Defect(test_site)
-
+                relaxed_lst.append(relaxed)
+            
             else:
+                energy_lst.append(np.inf)
 
-                energy = np.inf
+                type_lst.append(site_type)
 
-                relaxed = copy.deepcopy(test_site)
+        energy_arr = np.array(energy_lst)
 
-            energy_lst.append(energy)
+        min_energy_idx = np.argmin(energy_arr)
 
-            type_lst.append(site_type)
+        xyz_init = [[],[],[]]
 
-            idx_lst.append(idx)
+        xyz_init[element_idx].append(available_sites[type_lst[min_energy_idx]][0])    
 
-            relaxed_lst.append(relaxed)
+        return energy_lst[min_energy_idx], xyz_init, relaxed_lst[min_energy_idx]
 
-    energy_arr = np.array(energy_lst)
+    def check_proximity(self,xyz_init, test_site):
 
-    energy_arr = np.nan_to_num(energy_arr)
+        for xyz_element in xyz_init:
+            for vec in xyz_element:
+                distance = np.linalg.norm(test_site - vec)
+                if distance < 0.1:
+                    return False
+        
+        return True
+        
+    def minimize_add_intersitial(self, element_idx, xyz_init):
 
-    min_energy_idx = np.argmin(energy_arr)
+        energy_lst = []
 
-    xyz_init_new = copy.deepcopy(xyz_init)
+        type_lst = []
 
-    xyz_init_new[element_idx].append(available_sites[type_lst[min_energy_idx]][idx_lst[min_energy_idx]].tolist())    
+        idx_lst = []
 
-    return energy_lst[min_energy_idx], xyz_init_new, relaxed_lst[min_energy_idx]
+        relaxed_lst = []
+
+        available_sites = self.get_all_sites()
+
+        for site_type in available_sites:
+
+            for idx, site in enumerate(available_sites[site_type]):
+
+                valid = self.check_proximity(xyz_init, site)
+
+                test_site = copy.deepcopy(xyz_init)
+
+                test_site[element_idx].append(site)
+
+                if valid:
+
+                    energy, relaxed = self.Build_Defect(test_site)
+
+                else:
+
+                    energy = np.inf
+
+                    relaxed = copy.deepcopy(test_site)
+
+                energy_lst.append(energy)
+
+                type_lst.append(site_type)
+
+                idx_lst.append(idx)
+
+                relaxed_lst.append(relaxed)
+
+        energy_arr = np.array(energy_lst)
+
+        energy_arr = np.nan_to_num(energy_arr)
+
+        min_energy_idx = np.argmin(energy_arr)
+
+        xyz_init_new = copy.deepcopy(xyz_init)
+
+        xyz_init_new[element_idx].append(available_sites[type_lst[min_energy_idx]][idx_lst[min_energy_idx]].tolist())    
+
+        return energy_lst[min_energy_idx], xyz_init_new, relaxed_lst[min_energy_idx]
 
 
 size = 7
 
-b_energy = np.array([-8.949, -4.25/2, 0])
-
 pot_type = 'Daniel'
 
 Instance = Lammps_Point_Defect(size, 0, pot_type)
-
-perfect = Instance.Build_Defect()
-
-Instance.stress0 = Instance.stress_voigt
 
 Instance.n_vac = 1
 
@@ -554,7 +546,7 @@ for n_vac in range(3):
                 h_key = 0
                 he_key = i
 
-            energy_opt, xyz_init, xyz_opt = minimize_add_intersitial(Instance, element_idx,
+            energy_opt, xyz_init, xyz_opt = Instance.minimize_add_intersitial( element_idx,
                                             data['V%dH%dHe%d' % (
                                                                     n_vac, 
                                                                     np.clip(h_key - 1, a_min= 0, a_max=None),
@@ -578,12 +570,6 @@ for n_vac in range(3):
 
             data['V%dH%dHe%d' % (n_vac, h_key, he_key)]['relaxation_volume']   = Instance.relaxation_volume
 
-with open('Data/Defect Analysis/data_new.json', 'w') as file:
-    json.dump(data, file, indent=4)
-
-with open('Data/Defect Analysis/data_new.json', 'r') as file:
-    data = json.load(file)
-
 n_vac = 0
 
 for n_vac in range(2):
@@ -593,7 +579,7 @@ for n_vac in range(2):
         for he_key in range(1,7):
 
 
-            energy_opt, xyz_init, xyz_opt = minimize_add_intersitial(Instance, 1,
+            energy_opt, xyz_init, xyz_opt = Instance.minimize_add_intersitial( 1,
                                             data['V%dH%dHe%d' % (
                                                                     n_vac, 
                                                                     np.clip(h_key - 1, a_min= 0, a_max=None),
@@ -616,5 +602,5 @@ for n_vac in range(2):
 
 if Instance.me == 0:
 
-    with open('Data/Defect Analysis/point_defects_formations.json', 'w') as file:
+    with open('Data/My Data/point_defects_formations.json', 'w') as file:
         json.dump(data, file, indent=4)

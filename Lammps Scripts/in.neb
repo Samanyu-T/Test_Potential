@@ -14,7 +14,7 @@ mass 3 4.002602
 
 pair_style eam/alloy
 
-pair_coeff * * Potentials/Tungsten_Hydrogen_Helium/WHHe_test.eam.alloy W H He
+pair_coeff * * Potentials/Tungsten_Hydrogen_Helium/potential.eam.alloy W H He
 
 thermo 10
 

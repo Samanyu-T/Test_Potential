@@ -258,7 +258,7 @@ class Lammps_Point_Defect():
 
         sites = {}
 
-        offset = np.array([Instance.size//2, Instance.size//2, Instance.size - depth/2])
+        offset = np.array([Instance.size//2, Instance.size//2, depth])
 
         sites['oct'] =  offset + Instance.get_octahedral_sites()
 
@@ -485,7 +485,7 @@ Instance.n_vac = 0
 energy_lst = []
 
 for i in range(10):
-    energy, init, opt = minimize_single_intersitial(Instance, 1, i)
+    energy, init, opt = minimize_add_intersitial(Instance, 1, [[],[],[]],i)
 
     energy_lst.append(energy)
 
@@ -496,4 +496,4 @@ if Instance.me == 0:
 
 site = [3.25, 3.5, 8]
 
-Instance.Create_Animation([[],[site],[]])
+# Instance.Create_Animation([[],[site],[]])

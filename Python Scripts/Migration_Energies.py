@@ -68,7 +68,7 @@ class Lammps_Point_Defect():
 
             self.potfolder = 'Potentials/Tungsten_Hydrogen_Helium/'
 
-            self.potfile = self.potfolder + 'WHHe_test.eam.alloy'
+            self.potfile = self.potfolder + 'potential.eam.alloy'
 
     def mpiprint(self, string):
         if self.me == 0:
@@ -357,7 +357,7 @@ oct = Instance.get_octahedral_sites() + size//2
 
 pe_init, relaxed_init = Instance.Build_Defect('init', xyz_inter=[[],[], [tet[0]]])
 
-pe_final, relaxed_final = Instance.Build_Defect('final', xyz_inter=[[],[], [tet[3]]])
+pe_final, relaxed_final = Instance.Build_Defect('final', xyz_inter=[[],[], [tet[1]]])
 
 # N = 6
 
