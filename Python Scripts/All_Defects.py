@@ -3,6 +3,7 @@ import numpy as np
 import copy
 import json 
 import os 
+import matplotlib.pyplot as plt
 
 folder_path = "Lammps_Dump"
 
@@ -33,100 +34,129 @@ try:
 except:
     print('all deleted')
 
-size = 7
-
+size = 6
 pot_type = 'Daniel'
 
-Instance = Lammps_Point_Defect(size=size, n_vac=0, potential_type=pot_type, potfile='potential.eam.alloy', surface=False, depth=size//2)
+pe_arr = []
 
-Instance.n_vac = 1
+potname = 'Selected_Potentials/Potential_4/optim102.eam.alloy'
 
-data = {}
+# orientx = [1, 0, 0]
+# orienty = [0, 1, 0]
+# orientz = [0 ,0, 1]
 
-for n_vac in range(3):
+orientx = [1, 1, 0]
+orienty = [0, 0,-1]
+orientz = [-1,1, 0]
 
-    Instance.n_vac = n_vac
+
+# orientx = [1, 1, 0]
+# orienty = [0, 0,-1]
+# orientz = [-1,1, 0]
+
+
+R = np.array([orientx, orienty, orientz]).T
+alattice = 3.14484257
+
+Instance = Lammps_Point_Defect(size=size, n_vac=0, potential_type=pot_type, potfile=potname, surface=False, depth = 0,
+                                orientx=orientx, orienty=orienty, orientz=orientz)
+
+sites = Instance.get_all_sites()
+
+Instance.n_vac = 0
+
+pe_arr = []
+
+pe, pos = Instance.Build_Defect([[], [], [sites['tet'][0]]])
+
+print(pe, pos, Instance.relaxation_volume, Instance.alattice)
+
+# data = {}
+
+# for n_vac in range(3):
+
+#     Instance.n_vac = n_vac
     
-    vac_energy, _ = Instance.Build_Defect()
+#     vac_energy, _ = Instance.Build_Defect()
 
-    data['V%dH%dHe%d' % (n_vac, 0, 0)] = {}
+#     data['V%dH%dHe%d' % (n_vac, 0, 0)] = {}
 
-    data['V%dH%dHe%d' % (n_vac, 0, 0)]['energy_opt'] = vac_energy
+#     data['V%dH%dHe%d' % (n_vac, 0, 0)]['energy_opt'] = vac_energy
 
-    data['V%dH%dHe%d' % (n_vac, 0, 0)]['xyz_opt']    = [[],[],[]]
+#     data['V%dH%dHe%d' % (n_vac, 0, 0)]['xyz_opt']    = [[],[],[]]
 
-    data['V%dH%dHe%d' % (n_vac, 0, 0)]['strain_tensor']    = Instance.strain_tensor.tolist()
+#     data['V%dH%dHe%d' % (n_vac, 0, 0)]['strain_tensor']    = Instance.strain_tensor.tolist()
 
-    data['V%dH%dHe%d' % (n_vac, 0, 0)]['relaxation_volume']    = Instance.relaxation_volume
+#     data['V%dH%dHe%d' % (n_vac, 0, 0)]['relaxation_volume']    = Instance.relaxation_volume
 
-    for element_idx in [1,2]:
+#     for element_idx in [1,2]:
 
-        for i in range(1,7):
+#         for i in range(1,7):
 
-            if element_idx == 1:
-                h_key = i
-                he_key = 0
+#             if element_idx == 1:
+#                 h_key = i
+#                 he_key = 0
 
-            elif element_idx == 2:
-                h_key = 0
-                he_key = i
+#             elif element_idx == 2:
+#                 h_key = 0
+#                 he_key = i
 
-            energy_opt, xyz_init, xyz_opt = Instance.minimize_add_intersitial( element_idx,
-                                            data['V%dH%dHe%d' % (
-                                                                    n_vac, 
-                                                                    np.clip(h_key - 1, a_min= 0, a_max=None),
-                                                                    np.clip(he_key - 1, a_min= 0, a_max=None)
-                                                                   )
-                                                ]
-                                                ['xyz_opt']   
+#             energy_opt, xyz_init, xyz_opt = Instance.minimize_add_intersitial( element_idx,
+#                                             data['V%dH%dHe%d' % (
+#                                                                     n_vac, 
+#                                                                     np.clip(h_key - 1, a_min= 0, a_max=None),
+#                                                                     np.clip(he_key - 1, a_min= 0, a_max=None)
+#                                                                    )
+#                                                 ]
+#                                                 ['xyz_opt']   
 
 
                                                 
-                                                                    )
+#                                                                     )
             
 
-            data['V%dH%dHe%d' % (n_vac, h_key, he_key)] = {}
+#             data['V%dH%dHe%d' % (n_vac, h_key, he_key)] = {}
 
-            data['V%dH%dHe%d' % (n_vac, h_key, he_key)]['energy_opt'] = energy_opt
+#             data['V%dH%dHe%d' % (n_vac, h_key, he_key)]['energy_opt'] = energy_opt
 
-            data['V%dH%dHe%d' % (n_vac, h_key, he_key)]['xyz_opt']    = copy.deepcopy(xyz_opt)
+#             data['V%dH%dHe%d' % (n_vac, h_key, he_key)]['xyz_opt']    = copy.deepcopy(xyz_opt)
 
-            data['V%dH%dHe%d' % (n_vac, h_key, he_key)]['strain_tensor']       = Instance.strain_tensor.tolist()
+#             data['V%dH%dHe%d' % (n_vac, h_key, he_key)]['strain_tensor']       = Instance.strain_tensor.tolist()
 
-            data['V%dH%dHe%d' % (n_vac, h_key, he_key)]['relaxation_volume']   = Instance.relaxation_volume
+#             data['V%dH%dHe%d' % (n_vac, h_key, he_key)]['relaxation_volume']   = Instance.relaxation_volume
 
-n_vac = 0
+# n_vac = 0
 
-for n_vac in range(2):
-    Instance.n_vac = n_vac
+# for n_vac in range(2):
+#     Instance.n_vac = n_vac
 
-    for h_key in range(1,7):
-        for he_key in range(1,7):
-
-
-            energy_opt, xyz_init, xyz_opt = Instance.minimize_add_intersitial( 1,
-                                            data['V%dH%dHe%d' % (
-                                                                    n_vac, 
-                                                                    np.clip(h_key - 1, a_min= 0, a_max=None),
-                                                                    he_key
-                                                                    )
-                                                ]
-                                                ['xyz_opt']
-                                                                    )
-
-            data['V%dH%dHe%d' % (n_vac, h_key, he_key)] = {}
-
-            data['V%dH%dHe%d' % (n_vac, h_key, he_key)]['energy_opt'] = energy_opt
-
-            data['V%dH%dHe%d' % (n_vac, h_key, he_key)]['xyz_opt']    = copy.deepcopy(xyz_opt)
-
-            data['V%dH%dHe%d' % (n_vac, h_key, he_key)]['strain_tensor']       = Instance.strain_tensor.tolist()
-
-            data['V%dH%dHe%d' % (n_vac, h_key, he_key)]['relaxation_volume']   = Instance.relaxation_volume
+#     for h_key in range(1,7):
+#         for he_key in range(1,7):
 
 
-if Instance.me == 0:
+#             energy_opt, xyz_init, xyz_opt = Instance.minimize_add_intersitial( 1,
+#                                             data['V%dH%dHe%d' % (
+#                                                                     n_vac, 
+#                                                                     np.clip(h_key - 1, a_min= 0, a_max=None),
+#                                                                     he_key
+#                                                                     )
+#                                                 ]
+#                                                 ['xyz_opt']
+#                                                                     )
 
-    with open('Data/My Data/point_defects_formations.json', 'w') as file:
-        json.dump(data, file, indent=4)
+#             data['V%dH%dHe%d' % (n_vac, h_key, he_key)] = {}
+
+#             data['V%dH%dHe%d' % (n_vac, h_key, he_key)]['energy_opt'] = energy_opt
+
+#             data['V%dH%dHe%d' % (n_vac, h_key, he_key)]['xyz_opt']    = copy.deepcopy(xyz_opt)
+
+#             data['V%dH%dHe%d' % (n_vac, h_key, he_key)]['strain_tensor']       = Instance.strain_tensor.tolist()
+
+#             data['V%dH%dHe%d' % (n_vac, h_key, he_key)]['relaxation_volume']   = Instance.relaxation_volume
+
+
+# if Instance.me == 0:
+
+#     with open('Data/My Data/point_defects_formations.json', 'w') as file:
+#         json.dump(data, file, indent=4)
 

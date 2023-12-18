@@ -54,7 +54,8 @@ class MPI_to_serial():
 
 class Lammps_Point_Defect():
 
-    def __init__(self, size, n_vac, potential_type = 'Daniel', potfile = 'WHHe_test.eam.alloy', surface = False, depth = 0):
+    def __init__(self, size, n_vac, potential_type = 'Daniel', potfile = 'WHHe_test.eam.alloy', surface = False, depth = 0, 
+                 orientx = [1, 0, 0], orienty=[0,1,0], orientz=[0, 0, 1]):
 
         # try running in parallel, otherwise single thread
         try:
@@ -78,6 +79,10 @@ class Lammps_Point_Defect():
             self.mode = 'serial'
 
         self.comm.barrier()
+
+        self.orientx = orientx
+        self.orienty = orienty
+        self.orientz = orientz
 
         self.size  = int(size)
         self.n_vac = int(n_vac)
@@ -111,7 +116,7 @@ class Lammps_Point_Defect():
         self.Perfect_Crystal()
 
 
-    def Perfect_Crystal(self, alattice = 3.14484257):
+    def Perfect_Crystal(self, alattice = 3.144221296574379):
 
         ''' xyz_inter gives a list of the intersitial atoms for each species i,e W H He in that order
             they are in lattice units and are consistent with the Lammps co-ords of the cell'''
@@ -128,11 +133,21 @@ class Lammps_Point_Defect():
 
         lmp.command('boundary p p p')
 
-        lmp.command('lattice bcc %f orient x 1 0 0 orient y 0 1 0 orient z 0 0 1' % alattice)
+        lmp.command('lattice bcc %f orient x %d %d %d orient y %d %d %d orient z %d %d %d' % 
+                    (alattice,
+                    self.orientx[0], self.orientx[1], self.orientx[2],
+                    self.orienty[0], self.orienty[1], self.orienty[2], 
+                    self.orientz[0], self.orientz[1], self.orientz[2]
+                    ) 
+                    )
 
-        lmp.command('region r_simbox block 0 %d 0 %d 0 %d units lattice' % (self.size, self.size, self.size + self.surface))
+        size_x = self.size // np.sqrt(np.dot(self.orientx, self.orientx))
+        size_y = self.size // np.sqrt(np.dot(self.orienty, self.orienty))
+        size_z = self.size // np.sqrt(np.dot(self.orientz, self.orientz))
 
-        lmp.command('region r_atombox block 0 %d 0 %d 0 %d units lattice' % (self.size, self.size, self.size))
+        lmp.command('region r_simbox block -1e-9 %f -1e-9 %f -1e-9 %f units lattice' % (size_x, size_y, size_z + self.surface))
+
+        lmp.command('region r_atombox block -1e-9 %f -1e-9 %f -1e-9 %f units lattice' % (size_x, size_y, size_z))
                     
         lmp.command('create_box 3 r_simbox')
         
@@ -161,7 +176,7 @@ class Lammps_Point_Defect():
 
             lmp.command('pair_coeff * * %s W H He' % self.potfile)
 
-        lmp.command('fix 3 all box/relax  aniso 0.0')
+        lmp.command('fix 3 all box/relax aniso 0.0')
 
         lmp.command('run 0')
 
@@ -170,6 +185,8 @@ class Lammps_Point_Defect():
         lmp.command('thermo_style custom step temp pe pxx pyy pzz pxy pxz pyz vol')
         
         lmp.command('minimize 1e-9 1e-12 100 1000')
+        lmp.command('minimize 1e-12 1e-15 100 1000')
+        lmp.command('minimize 1e-13 1e-16 1000 10000')
 
         lmp.command('write_data Elastic_Data/perfect.data')
         
@@ -184,15 +201,19 @@ class Lammps_Point_Defect():
 
         self.stress0 = np.array([pxx, pyy, pzz, pxy, pxz, pyz]) 
         
-        self.alattice = (lmp.get_thermo('xhi') - lmp.get_thermo('xlo'))/self.size
+        # self.alattice = lmp.get_thermo('xlat') / np.sqrt(np.dot(self.orientx, self.orientx))
+
+        self.alattice = lmp.get_thermo('lx') / ( size_x * np.sqrt(np.dot(self.orientx, self.orientx)) )
 
         self.pe0 = lmp.get_thermo('pe')
 
         self.vol0 = lmp.get_thermo('vol')
 
+        self.N_atoms = lmp.get_natoms()
+
         lmp.close()
 
-    def Build_Defect(self, xyz_inter = [[], [], []], alattice = 3.14484257):
+    def Build_Defect(self, xyz_inter = [[], [], []], alattice = 3.144221296574379):
 
         ''' xyz_inter gives a list of the intersitial atoms for each species i,e W H He in that order
             they are in lattice units and are consistent with the Lammps co-ords of the cell'''
@@ -208,13 +229,24 @@ class Lammps_Point_Defect():
         lmp.command('atom_modify map array sort 0 0.0')
 
         lmp.command('boundary p p p')
+        
+        lmp.command('lattice bcc %f orient x %d %d %d orient y %d %d %d orient z %d %d %d' % 
+                    (self.alattice,
+                    self.orientx[0], self.orientx[1], self.orientx[2],
+                    self.orienty[0], self.orienty[1], self.orienty[2], 
+                    self.orientz[0], self.orientz[1], self.orientz[2]
+                    ) 
+                    )        
+        
 
-        lmp.command('lattice bcc %f orient x 1 0 0 orient y 0 1 0 orient z 0 0 1' % self.alattice)
+        size_x = self.size // np.sqrt(np.dot(self.orientx, self.orientx))
+        size_y = self.size // np.sqrt(np.dot(self.orienty, self.orienty))
+        size_z = self.size // np.sqrt(np.dot(self.orientz, self.orientz))
 
-        lmp.command('region r_simbox block 0 %d 0 %d 0 %d units lattice' % (self.size, self.size, self.size + self.surface))
+        lmp.command('region r_simbox block -1e-9 %f -1e-9 %f -1e-9 %f units lattice' % (size_x, size_y, size_z + self.surface))
 
-        lmp.command('region r_atombox block 0 %d 0 %d 0 %d units lattice' % (self.size, self.size, self.size))
-                    
+        lmp.command('region r_atombox block -1e-9 %f -1e-9 %f -1e-9 %f units lattice' % (size_x, size_y, size_z))
+        
         lmp.command('create_box 3 r_simbox')
         
         lmp.command('create_atoms 1 region r_atombox')
@@ -266,13 +298,13 @@ class Lammps_Point_Defect():
 
         lmp.command('thermo_style custom step temp pe pxx pyy pzz pxy pxz pyz vol')
 
-        # lmp.command('fix 3 all box/relax  aniso 0.0')
+        lmp.command('fix 3 all box/relax  aniso 0.0')
 
         lmp.command('minimize 1e-15 1e-18 10 10')
 
         lmp.command('minimize 1e-15 1e-18 10 100')
 
-        lmp.command('minimize 1e-15 1e-18 100 1000')
+        lmp.command('minimize 1e-15 1e-18 1000 1000')
         
         pe = lmp.get_thermo('pe')
 
@@ -289,8 +321,9 @@ class Lammps_Point_Defect():
 
         self.strain_tensor = self.find_strain()
 
-        self.relaxation_volume = 2*np.trace(self.strain_tensor)*self.vol/self.alattice**3
-        # self.relaxation_volume = 2*(self.vol - self.vol0)/self.alattice**3
+        # self.relaxation_volume = 2*np.trace(self.strain_tensor)*self.vol/self.alattice**3
+
+        self.relaxation_volume = 2*(self.vol - self.vol0)/self.alattice**3
 
         lmp.command('write_dump all atom Lammps_Dump/(Vac:%d)(H:%d)(He:%d).atom' % 
                     (self.n_vac, len(xyz_inter[1]), len(xyz_inter[2])))
@@ -306,7 +339,7 @@ class Lammps_Point_Defect():
 
         xyz_inter_relaxed = [[],[],[]]
 
-        N_atoms = 2*self.size**3 - self.n_vac
+        N_atoms = self.N_atoms - self.n_vac
 
         idx = 0
 
