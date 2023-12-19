@@ -84,6 +84,8 @@ class Lammps_Point_Defect():
         self.orienty = orienty
         self.orientz = orientz
 
+        self.R = np.linalg.inv(np.array([orientx, orienty, orientz]).T)
+
         self.size  = int(size)
         self.n_vac = int(n_vac)
         self.pot_type = potential_type
@@ -116,7 +118,7 @@ class Lammps_Point_Defect():
         self.Perfect_Crystal()
 
 
-    def Perfect_Crystal(self, alattice = 3.144221296574379):
+    def Perfect_Crystal(self, conv = 100, alattice = 3.144221296574379):
 
         ''' xyz_inter gives a list of the intersitial atoms for each species i,e W H He in that order
             they are in lattice units and are consistent with the Lammps co-ords of the cell'''
@@ -148,7 +150,12 @@ class Lammps_Point_Defect():
         lmp.command('region r_simbox block -1e-9 %f -1e-9 %f -1e-9 %f units lattice' % (size_x, size_y, size_z + self.surface))
 
         lmp.command('region r_atombox block -1e-9 %f -1e-9 %f -1e-9 %f units lattice' % (size_x, size_y, size_z))
-                    
+
+
+        # lmp.command('region r_simbox block 0 %f 0 %f 0 %f units lattice' % (size_x, size_y, size_z + self.surface))
+
+        # lmp.command('region r_atombox block 0 %f 0 %f 0 %f units lattice' % (size_x, size_y, size_z))
+
         lmp.command('create_box 3 r_simbox')
         
         lmp.command('create_atoms 1 region r_atombox')
@@ -186,7 +193,7 @@ class Lammps_Point_Defect():
         
         lmp.command('minimize 1e-9 1e-12 100 1000')
         lmp.command('minimize 1e-12 1e-15 100 1000')
-        lmp.command('minimize 1e-13 1e-16 1000 10000')
+        lmp.command('minimize 1e-13 1e-16 %d %d' % (conv, conv))
 
         lmp.command('write_data Elastic_Data/perfect.data')
         
@@ -201,15 +208,15 @@ class Lammps_Point_Defect():
 
         self.stress0 = np.array([pxx, pyy, pzz, pxy, pxz, pyz]) 
         
-        # self.alattice = lmp.get_thermo('xlat') / np.sqrt(np.dot(self.orientx, self.orientx))
+        self.alattice = lmp.get_thermo('xlat') / np.sqrt(np.dot(self.orientx, self.orientx))
 
-        self.alattice = lmp.get_thermo('lx') / ( size_x * np.sqrt(np.dot(self.orientx, self.orientx)) )
+        # self.alattice = lmp.get_thermo('lx') / ( size_x * np.sqrt(np.dot(self.orientx, self.orientx)) )
+
+        self.N_atoms = lmp.get_natoms()
 
         self.pe0 = lmp.get_thermo('pe')
 
         self.vol0 = lmp.get_thermo('vol')
-
-        self.N_atoms = lmp.get_natoms()
 
         lmp.close()
 
@@ -231,7 +238,8 @@ class Lammps_Point_Defect():
         lmp.command('boundary p p p')
         
         lmp.command('lattice bcc %f orient x %d %d %d orient y %d %d %d orient z %d %d %d' % 
-                    (self.alattice,
+                    (
+                    self.alattice,
                     self.orientx[0], self.orientx[1], self.orientx[2],
                     self.orienty[0], self.orienty[1], self.orienty[2], 
                     self.orientz[0], self.orientz[1], self.orientz[2]
@@ -246,11 +254,16 @@ class Lammps_Point_Defect():
         lmp.command('region r_simbox block -1e-9 %f -1e-9 %f -1e-9 %f units lattice' % (size_x, size_y, size_z + self.surface))
 
         lmp.command('region r_atombox block -1e-9 %f -1e-9 %f -1e-9 %f units lattice' % (size_x, size_y, size_z))
-        
+    
+        # lmp.command('region r_simbox block 0 %f 0 %f 0 %f units lattice' % (size_x, size_y, size_z + self.surface))
+
+        # lmp.command('region r_atombox block 0 %f 0 %f 0 %f units lattice' % (size_x, size_y, size_z))
+
         lmp.command('create_box 3 r_simbox')
         
         lmp.command('create_atoms 1 region r_atombox')
 
+        self.N_atoms = lmp.get_natoms()
 
         #Create a Vacancy of n-atoms along the <1,1,1> direction the vacancy will be at the centre of the cell
 
@@ -298,13 +311,13 @@ class Lammps_Point_Defect():
 
         lmp.command('thermo_style custom step temp pe pxx pyy pzz pxy pxz pyz vol')
 
-        lmp.command('fix 3 all box/relax  aniso 0.0')
+        lmp.command('fix 3 all box/relax aniso 0.0')
 
         lmp.command('minimize 1e-15 1e-18 10 10')
 
         lmp.command('minimize 1e-15 1e-18 10 100')
 
-        lmp.command('minimize 1e-15 1e-18 1000 1000')
+        lmp.command('minimize 1e-15 1e-18 100 1000')
         
         pe = lmp.get_thermo('pe')
 
@@ -352,7 +365,7 @@ class Lammps_Point_Defect():
 
         lmp.close()
 
-        e0 = self.pe0/(2*self.size**3)
+        e0 = self.pe0/self.N_atoms
 
         return pe - self.pe0 + self.n_vac*e0 + len(xyz_inter[1])*2.121, xyz_inter_relaxed
     
